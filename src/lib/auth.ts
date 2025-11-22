@@ -1,18 +1,19 @@
+import { Entry } from '@napi-rs/keyring';
 import { config } from './config.js';
 
 const SERVICE_NAME = 'ynab-cli';
 const ACCOUNT_NAME = 'access-token';
 
-const KEYTAR_UNAVAILABLE_ERROR =
+const KEYRING_UNAVAILABLE_ERROR =
   'Keychain storage unavailable. Cannot store credentials securely.\n' +
   'On Linux, install libsecret: sudo apt-get install libsecret-1-dev\n' +
   'Then reinstall: npm install -g @stephendolan/ynab-cli\n' +
   'Alternatively, use the YNAB_API_KEY environment variable.';
 
-let keytar: typeof import('keytar') | undefined;
+let keyring: Entry | undefined;
 
 try {
-  keytar = await import('keytar');
+  keyring = new Entry(SERVICE_NAME, ACCOUNT_NAME);
 } catch (error) {
   if (process.env.NODE_ENV !== 'test') {
     console.error(
@@ -25,23 +26,24 @@ try {
 
 export class AuthManager {
   async getAccessToken(): Promise<string | null> {
-    if (keytar) {
-      return keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+    if (keyring) {
+      return keyring.getPassword();
     }
     return null;
   }
 
   async setAccessToken(token: string): Promise<void> {
-    if (keytar) {
-      await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, token);
+    if (keyring) {
+      keyring.setPassword(token);
     } else {
-      throw new Error(KEYTAR_UNAVAILABLE_ERROR);
+      throw new Error(KEYRING_UNAVAILABLE_ERROR);
     }
   }
 
   async deleteAccessToken(): Promise<boolean> {
-    if (keytar) {
-      return keytar.deletePassword(SERVICE_NAME, ACCOUNT_NAME);
+    if (keyring) {
+      keyring.deletePassword();
+      return true;
     }
     return false;
   }

@@ -38,7 +38,7 @@ The CLI follows a command-based architecture built on Commander.js:
   - Commands: auth, user, budgets, accounts, categories, transactions, scheduled, payees, months, api
 - **src/lib/**: Shared utilities and core functionality
   - **api-client.ts**: Main YNAB API wrapper (`YnabClient` class) - single source of truth for API calls
-  - **auth.ts**: OS keychain integration via keytar for secure token storage
+  - **auth.ts**: OS keychain integration via @napi-rs/keyring for secure token storage
   - **config.ts**: Application config management via `conf` package (stores default budget ID)
   - **output.ts**: JSON output formatting with automatic milliunit conversion
   - **utils.ts**: Currency conversion, date formatting, filtering, field selection
@@ -51,7 +51,7 @@ The CLI follows a command-based architecture built on Commander.js:
 
 1. Priority order: CLI keychain → `YNAB_API_KEY` env var
 2. Default budget: `--budget` flag → config file → `YNAB_BUDGET_ID` env var
-3. Tokens stored in OS keychain via keytar (service: 'ynab-cli', account: 'access-token')
+3. Tokens stored in OS keychain via @napi-rs/keyring (service: 'ynab-cli', account: 'access-token')
 
 ### Currency Handling
 
