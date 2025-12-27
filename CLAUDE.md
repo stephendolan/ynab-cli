@@ -10,21 +10,21 @@ YNAB CLI is a command-line interface for You Need a Budget (YNAB) designed for L
 
 ### Running and Building
 ```bash
-npm run dev          # Run CLI in development mode with tsx (no build required)
-npm run build        # Build for production using tsup
-npm run link         # Build and link globally (makes `ynab` available system-wide)
-npm start            # Run built CLI from dist/
+bun run dev          # Run CLI in development mode (no build required)
+bun run build        # Build for production using tsup
+bun run link         # Build and link globally (makes `ynab` available system-wide)
+bun run start        # Run built CLI from dist/
 
 # Testing the CLI locally
-tsx src/cli.ts <command>     # Run directly without building
-node dist/cli.js <command>   # Run after building
+bun run src/cli.ts <command>     # Run directly without building
+bun dist/cli.js <command>        # Run after building
 ```
 
 ### Quality Checks
 ```bash
-npm run typecheck    # Type check without emitting files
-npm run lint         # Lint TypeScript files in src/
-npm test            # Run vitest tests
+bun run typecheck    # Type check without emitting files
+bun run lint         # Lint TypeScript files in src/
+bun test             # Run vitest tests
 ```
 
 ## Architecture
@@ -106,10 +106,10 @@ These operations must be done through YNAB's web/mobile apps.
 
 ## Testing
 
-Tests use Vitest. Run with `npm test`.
+Tests use Vitest. Run with `bun test`.
 
 ## Build Configuration
 
-- **tsup.config.ts**: Bundles src/cli.ts → dist/cli.js as ESM for Node 18+
+- **tsup.config.ts**: Bundles src/cli.ts → dist/cli.js as ESM
 - **package.json**: Type is "module" (ESM), main is dist/cli.js, bin is "ynab"
-- Shebang in src/cli.ts makes dist/cli.js directly executable
+- Shebang `#!/usr/bin/env bun` in src/cli.ts makes dist/cli.js directly executable

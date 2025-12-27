@@ -1,6 +1,6 @@
 {
   "name": "@stephendolan/ynab-cli",
-  "version": "1.2.6",
+  "version": "2.0.0",
   "description": "A command-line interface for You Need a Budget (YNAB)",
   "type": "module",
   "main": "./dist/cli.js",
@@ -8,17 +8,16 @@
     "ynab": "dist/cli.js"
   },
   "scripts": {
-    "dev": "tsx src/cli.ts",
-    "build": "tsup",
-    "test": "vitest",
-    "lint": "oxlint src",
-    "format": "biome format --write src",
-    "format:check": "biome format src",
-    "typecheck": "tsc --noEmit",
-    "link": "npm run build && npm link",
-    "start": "node dist/cli.js",
-    "audit": "npm audit --audit-level=moderate",
-    "prepublishOnly": "npm run build"
+    "dev": "bun run src/cli.ts",
+    "build": "bun run tsup",
+    "test": "bun run vitest",
+    "lint": "bun run oxlint src",
+    "format": "bun run biome format --write src",
+    "format:check": "bun run biome format src",
+    "typecheck": "bun run tsc --noEmit",
+    "link": "bun run build && bun link",
+    "start": "bun dist/cli.js",
+    "prepublishOnly": "bun run build"
   },
   "keywords": [
     "ynab",
@@ -67,6 +66,6 @@
     "vitest": "^4.0.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "bun": ">=1.0.0"
   }
 }

@@ -7,7 +7,7 @@ const ACCOUNT_NAME = 'access-token';
 const KEYRING_UNAVAILABLE_ERROR =
   'Keychain storage unavailable. Cannot store credentials securely.\n' +
   'On Linux, install libsecret: sudo apt-get install libsecret-1-dev\n' +
-  'Then reinstall: npm install -g @stephendolan/ynab-cli\n' +
+  'Then reinstall: bun install -g @stephendolan/ynab-cli\n' +
   'Alternatively, use the YNAB_API_KEY environment variable.';
 
 let keyring: Entry | null | undefined = undefined;

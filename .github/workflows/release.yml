@@ -11,15 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '24'
-          cache: 'npm'
+          bun-version: latest
 
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
+      - run: bun install
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun test
 
   publish:
     needs: test
@@ -30,14 +29,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
-      - run: npm ci
-      - run: npm run build
+      - run: bun install
+      - run: bun run build
 
       - name: Publish to npm
         run: npm publish --provenance --access public

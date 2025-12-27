@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@stephendolan/ynab-cli.svg)](https://www.npmjs.com/package/@stephendolan/ynab-cli)
 [![npm downloads](https://img.shields.io/npm/dm/@stephendolan/ynab-cli.svg)](https://www.npmjs.com/package/@stephendolan/ynab-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/node/v/@stephendolan/ynab-cli.svg)](https://nodejs.org)
+[![Bun](https://img.shields.io/badge/Bun-%3E%3D1.0-black)](https://bun.sh)
 
 A command-line interface for You Need a Budget (YNAB) designed to enable LLMs (Claude, ChatGPT, etc.) and developers to quickly interface with YNAB budgets, make changes, and audit financial data.
 
@@ -18,12 +18,15 @@ A command-line interface for You Need a Budget (YNAB) designed to enable LLMs (C
 
 ## Installation
 
+Requires [Bun](https://bun.sh) runtime.
+
 ```bash
-# Install globally
-npm install -g @stephendolan/ynab-cli
+# Install globally with bun (recommended)
+bun install -g @stephendolan/ynab-cli
 
 # Or run directly without installing
-npx @stephendolan/ynab-cli budgets list
+bunx @stephendolan/ynab-cli budgets list
+npx @stephendolan/ynab-cli budgets list  # also works
 ```
 
 ### Linux Prerequisites
@@ -48,8 +51,8 @@ Without `libsecret`, use the `YNAB_API_KEY` environment variable instead.
 ```bash
 git clone https://github.com/stephendolan/ynab-cli.git
 cd ynab-cli
-npm install
-npm run link  # Build and link globally
+bun install
+bun run link  # Build and link globally
 ```
 
 ## Authentication
