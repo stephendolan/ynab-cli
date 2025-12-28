@@ -1,7 +1,4 @@
-import { handleYnabError } from './errors.js';
-import { promptForConfirmation } from './prompts.js';
-import { isInteractive } from './utils.js';
-import { outputJson } from './output.js';
+import { handleYnabError, YnabCliError } from './errors.js';
 
 export function withErrorHandling<TArgs extends unknown[], R>(
   fn: (...args: TArgs) => Promise<R>
@@ -15,24 +12,13 @@ export function withErrorHandling<TArgs extends unknown[], R>(
   };
 }
 
-export async function confirmDelete(
-  itemType: string,
-  skipConfirmation: boolean = false
-): Promise<boolean> {
-  if (skipConfirmation || !isInteractive()) {
-    return true;
-  }
-
-  const confirmed = await promptForConfirmation(
-    `Are you sure you want to delete this ${itemType}?`
-  );
-
+export function requireConfirmation(itemType: string, confirmed: boolean = false): void {
   if (!confirmed) {
-    outputJson({ message: 'Operation cancelled' });
-    return false;
+    throw new YnabCliError(
+      `Deleting ${itemType} requires --yes flag to confirm`,
+      400
+    );
   }
-
-  return true;
 }
 
 export function buildUpdateObject<T>(

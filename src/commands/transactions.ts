@@ -2,16 +2,15 @@ import { Command } from 'commander';
 import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { YnabCliError } from '../lib/errors.js';
-import { promptForTransaction } from '../lib/prompts.js';
 import {
-  isInteractive,
   amountToMilliunits,
   applyTransactionFilters,
   applyFieldSelection,
   type TransactionLike,
 } from '../lib/utils.js';
-import { withErrorHandling, confirmDelete, buildUpdateObject } from '../lib/command-utils.js';
-import { validateJson, TransactionSplitSchema } from '../lib/schemas.js';
+import { withErrorHandling, requireConfirmation, buildUpdateObject } from '../lib/command-utils.js';
+import { validateTransactionSplits } from '../lib/schemas.js';
+import { parseDate, todayDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
 interface TransactionOptions {
@@ -36,7 +35,7 @@ function buildTransactionData(options: TransactionOptions): Record<string, unkno
 
   return {
     account_id: options.account,
-    date: options.date || new Date().toISOString().split('T')[0],
+    date: options.date ? parseDate(options.date) : todayDate(),
     amount: amountToMilliunits(options.amount),
     payee_name: options.payeeName,
     payee_id: options.payeeId,
@@ -57,8 +56,8 @@ export function createTransactionsCommand(): Command {
     .option('--account <id>', 'Filter by account ID')
     .option('--category <id>', 'Filter by category ID')
     .option('--payee <id>', 'Filter by payee ID')
-    .option('--since <date>', 'Filter transactions since date (YYYY-MM-DD)')
-    .option('--until <date>', 'Filter transactions until date (YYYY-MM-DD)')
+    .option('--since <date>', 'Filter transactions since date')
+    .option('--until <date>', 'Filter transactions until date')
     .option('--type <type>', 'Filter by transaction type')
     .option('--approved <value>', 'Filter by approval status: true or false')
     .option(
@@ -91,7 +90,7 @@ export function createTransactionsCommand(): Command {
         ) => {
           const params = {
             budgetId: options.budget,
-            sinceDate: options.since,
+            sinceDate: options.since ? parseDate(options.since) : undefined,
             type: options.type,
           };
 
@@ -106,7 +105,7 @@ export function createTransactionsCommand(): Command {
           const transactions = result?.transactions || [];
 
           const filtered = applyTransactionFilters(transactions as TransactionLike[], {
-            until: options.until,
+            until: options.until ? parseDate(options.until) : undefined,
             approved: options.approved,
             status: options.status,
             minAmount: options.minAmount,
@@ -137,7 +136,7 @@ export function createTransactionsCommand(): Command {
     .description('Create transaction')
     .option('-b, --budget <id>', 'Budget ID')
     .option('--account <id>', 'Account ID')
-    .option('--date <date>', 'Date (YYYY-MM-DD)')
+    .option('--date <date>', 'Transaction date')
     .option('--amount <amount>', 'Amount in currency units (e.g., 10.50)', parseFloat)
     .option('--payee-name <name>', 'Payee name')
     .option('--payee-id <id>', 'Payee ID')
@@ -161,17 +160,7 @@ export function createTransactionsCommand(): Command {
             approved?: boolean;
           } & CommandOptions
         ) => {
-          const shouldPrompt = isInteractive() && !options.amount;
-          if (shouldPrompt && !options.account) {
-            throw new YnabCliError(
-              '--account is required. Interactive mode cannot auto-select an account.',
-              400
-            );
-          }
-          const transactionData = shouldPrompt
-            ? { ...(await promptForTransaction()), account_id: options.account }
-            : buildTransactionData(options);
-
+          const transactionData = buildTransactionData(options);
           const transaction = await client.createTransaction(
             { transaction: transactionData },
             options.budget
@@ -187,7 +176,7 @@ export function createTransactionsCommand(): Command {
     .argument('<id>', 'Transaction ID')
     .option('-b, --budget <id>', 'Budget ID')
     .option('--account <id>', 'Account ID')
-    .option('--date <date>', 'Date (YYYY-MM-DD)')
+    .option('--date <date>', 'Transaction date')
     .option('--amount <amount>', 'Amount in currency units', parseFloat)
     .option('--payee-name <name>', 'Payee name')
     .option('--payee-id <id>', 'Payee ID')
@@ -232,10 +221,7 @@ export function createTransactionsCommand(): Command {
     .action(
       withErrorHandling(
         async (id: string, options: { budget?: string; yes?: boolean } & CommandOptions) => {
-          if (!(await confirmDelete('transaction', options.yes))) {
-            return;
-          }
-
+          requireConfirmation('transaction', options.yes);
           const transaction = await client.deleteTransaction(id, options.budget);
           outputJson({ message: 'Transaction deleted', transaction });
         }
@@ -278,7 +264,7 @@ export function createTransactionsCommand(): Command {
             throw new YnabCliError('Invalid JSON in --splits parameter', 400);
           }
 
-          const splits = validateJson(parsedSplits, TransactionSplitSchema, 'transaction splits');
+          const splits = validateTransactionSplits(parsedSplits);
 
           const splitsInMilliunits = splits.map((split) => ({
             ...split,
@@ -343,8 +329,8 @@ export function createTransactionsCommand(): Command {
     .option('--memo <text>', 'Search in memo field')
     .option('--payee-name <name>', 'Search in payee name')
     .option('--amount <amount>', 'Search for exact amount in currency units', parseFloat)
-    .option('--since <date>', 'Search transactions since date (YYYY-MM-DD)')
-    .option('--until <date>', 'Search transactions until date (YYYY-MM-DD)')
+    .option('--since <date>', 'Search transactions since date')
+    .option('--until <date>', 'Search transactions until date')
     .option('--approved <value>', 'Filter by approval status: true or false')
     .option(
       '--status <statuses>',
@@ -375,7 +361,7 @@ export function createTransactionsCommand(): Command {
 
           const params = {
             budgetId: options.budget,
-            sinceDate: options.since,
+            sinceDate: options.since ? parseDate(options.since) : undefined,
           };
 
           const result = await client.getTransactions(params);
@@ -399,7 +385,7 @@ export function createTransactionsCommand(): Command {
           }
 
           transactions = applyTransactionFilters(transactions, {
-            until: options.until,
+            until: options.until ? parseDate(options.until) : undefined,
             approved: options.approved,
             status: options.status,
           });

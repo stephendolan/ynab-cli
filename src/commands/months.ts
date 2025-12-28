@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { withErrorHandling } from '../lib/command-utils.js';
+import { parseDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
 export function createMonthsCommand(): Command {
@@ -24,11 +25,11 @@ export function createMonthsCommand(): Command {
   cmd
     .command('view')
     .description('View specific month details')
-    .argument('<month>', 'Month in YYYY-MM-DD format (e.g., 2025-07-01)')
+    .argument('<month>', 'Budget month (e.g., 2025-07-01)')
     .option('-b, --budget <id>', 'Budget ID')
     .action(
       withErrorHandling(async (month: string, options: CommandOptions) => {
-        const monthData = await client.getBudgetMonth(month, options.budget);
+        const monthData = await client.getBudgetMonth(parseDate(month), options.budget);
         outputJson(monthData);
       })
     );

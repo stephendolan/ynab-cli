@@ -1,6 +1,6 @@
 {
   "name": "@stephendolan/ynab-cli",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A command-line interface for You Need a Budget (YNAB)",
   "type": "module",
   "main": "./dist/cli.js",
@@ -46,18 +46,14 @@
   ],
   "dependencies": {
     "@napi-rs/keyring": "^1.2.0",
-    "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "conf": "^12.0.0",
-    "date-fns": "^3.0.0",
+    "dayjs": "^1.11.19",
     "dotenv": "^16.4.0",
-    "inquirer": "^9.2.0",
-    "ynab": "^2.10.0",
-    "zod": "^3.22.0"
+    "ynab": "^2.10.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/inquirer": "^9.0.0",
     "@types/node": "^20.0.0",
     "oxlint": "^0.16.0",
     "tsup": "^8.0.0",

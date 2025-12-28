@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
-import { withErrorHandling, confirmDelete } from '../lib/command-utils.js';
+import { withErrorHandling, requireConfirmation } from '../lib/command-utils.js';
 import type { CommandOptions } from '../types/index.js';
 
 export function createScheduledCommand(): Command {
@@ -45,10 +45,7 @@ export function createScheduledCommand(): Command {
     .action(
       withErrorHandling(
         async (id: string, options: { budget?: string; yes?: boolean } & CommandOptions) => {
-          if (!(await confirmDelete('scheduled transaction', options.yes))) {
-            return;
-          }
-
+          requireConfirmation('scheduled transaction', options.yes);
           const scheduledTransaction = await client.deleteScheduledTransaction(id, options.budget);
           outputJson({
             message: 'Scheduled transaction deleted',

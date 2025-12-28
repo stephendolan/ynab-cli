@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import { auth } from '../lib/auth.js';
-import { promptForAccessToken } from '../lib/prompts.js';
 import { outputJson } from '../lib/output.js';
 import { client } from '../lib/api-client.js';
 import { withErrorHandling } from '../lib/command-utils.js';
+import { YnabCliError } from '../lib/errors.js';
 
 export function createAuthCommand(): Command {
   const cmd = new Command('auth').description('Authentication management');
@@ -11,9 +11,13 @@ export function createAuthCommand(): Command {
   cmd
     .command('login')
     .description('Configure access token')
+    .requiredOption('-t, --token <token>', 'YNAB Personal Access Token')
     .action(
-      withErrorHandling(async () => {
-        const token = await promptForAccessToken();
+      withErrorHandling(async (options: { token: string }) => {
+        const token = options.token.trim();
+        if (!token) {
+          throw new YnabCliError('Access token cannot be empty', 400);
+        }
         await auth.setAccessToken(token);
         client.clearApi();
 

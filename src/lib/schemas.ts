@@ -1,25 +1,40 @@
-import { z } from 'zod';
 import { YnabCliError } from './errors.js';
 
-export const TransactionSplitSchema = z.array(
-  z.object({
-    amount: z.number(),
-    category_id: z.string().nullable().optional(),
-    memo: z.string().optional(),
-    payee_id: z.string().optional(),
-  })
-);
+export interface TransactionSplit {
+  amount: number;
+  category_id?: string | null;
+  memo?: string;
+  payee_id?: string;
+}
 
-export const ApiDataSchema = z.record(z.any());
-
-export function validateJson<T>(data: unknown, schema: z.ZodSchema<T>, fieldName: string): T {
-  try {
-    return schema.parse(data);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const issues = error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
-      throw new YnabCliError(`Invalid ${fieldName}: ${issues}`, 400);
-    }
-    throw error;
+export function validateTransactionSplits(data: unknown): TransactionSplit[] {
+  if (!Array.isArray(data)) {
+    throw new YnabCliError('Transaction splits must be an array', 400);
   }
+
+  return data.map((item, index) => {
+    if (typeof item !== 'object' || item === null) {
+      throw new YnabCliError(`Split at index ${index} must be an object`, 400);
+    }
+
+    const split = item as Record<string, unknown>;
+
+    if (typeof split.amount !== 'number') {
+      throw new YnabCliError(`Split at index ${index} must have a numeric amount`, 400);
+    }
+
+    return {
+      amount: split.amount,
+      category_id: split.category_id as string | null | undefined,
+      memo: split.memo as string | undefined,
+      payee_id: split.payee_id as string | undefined,
+    };
+  });
+}
+
+export function validateApiData(data: unknown): Record<string, unknown> {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw new YnabCliError('API data must be an object', 400);
+  }
+  return data as Record<string, unknown>;
 }

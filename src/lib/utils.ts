@@ -8,10 +8,6 @@ export function amountToMilliunits(amount: number): number {
   return Math.round(amount * 1000);
 }
 
-export function isInteractive(): boolean {
-  return process.stdin.isTTY === true;
-}
-
 export function convertMilliunitsToAmounts(data: unknown): unknown {
   if (data === null || data === undefined) return data;
   if (Array.isArray(data)) return data.map(convertMilliunitsToAmounts);

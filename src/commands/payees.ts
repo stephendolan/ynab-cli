@@ -3,6 +3,7 @@ import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { YnabCliError } from '../lib/errors.js';
 import { withErrorHandling } from '../lib/command-utils.js';
+import { parseDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
 export function createPayeesCommand(): Command {
@@ -74,7 +75,7 @@ export function createPayeesCommand(): Command {
     .description('List transactions for payee')
     .argument('<id>', 'Payee ID')
     .option('-b, --budget <id>', 'Budget ID')
-    .option('--since <date>', 'Filter transactions since date (YYYY-MM-DD)')
+    .option('--since <date>', 'Filter transactions since date')
     .option('--type <type>', 'Filter by transaction type')
     .option('--last-knowledge <number>', 'Last knowledge of server', parseInt)
     .action(
@@ -90,7 +91,7 @@ export function createPayeesCommand(): Command {
         ) => {
           const result = await client.getTransactionsByPayee(id, {
             budgetId: options.budget,
-            sinceDate: options.since,
+            sinceDate: options.since ? parseDate(options.since) : undefined,
             type: options.type,
             lastKnowledgeOfServer: options.lastKnowledge,
           });

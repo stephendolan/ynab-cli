@@ -4,6 +4,7 @@ import { outputJson } from '../lib/output.js';
 import { YnabCliError } from '../lib/errors.js';
 import { amountToMilliunits } from '../lib/utils.js';
 import { withErrorHandling } from '../lib/command-utils.js';
+import { parseDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
 export function createCategoriesCommand(): Command {
@@ -39,7 +40,7 @@ export function createCategoriesCommand(): Command {
     .command('budget')
     .description('Set category budgeted amount for a month (overrides existing amount)')
     .argument('<id>', 'Category ID')
-    .requiredOption('--month <month>', 'Month in YYYY-MM-DD format (e.g., 2025-07-01)')
+    .requiredOption('--month <month>', 'Budget month (e.g., 2025-07-01)')
     .requiredOption('--amount <amount>', 'Total budgeted amount to set (e.g., 100.50)', parseFloat)
     .option('-b, --budget <id>', 'Budget ID')
     .action(
@@ -58,7 +59,7 @@ export function createCategoriesCommand(): Command {
 
           const milliunits = amountToMilliunits(options.amount);
           const category = await client.updateMonthCategory(
-            options.month,
+            parseDate(options.month),
             id,
             { category: { budgeted: milliunits } },
             options.budget
@@ -73,7 +74,7 @@ export function createCategoriesCommand(): Command {
     .description('List transactions for category')
     .argument('<id>', 'Category ID')
     .option('-b, --budget <id>', 'Budget ID')
-    .option('--since <date>', 'Filter transactions since date (YYYY-MM-DD)')
+    .option('--since <date>', 'Filter transactions since date')
     .option('--type <type>', 'Filter by transaction type')
     .option('--last-knowledge <number>', 'Last knowledge of server', parseInt)
     .action(
@@ -89,7 +90,7 @@ export function createCategoriesCommand(): Command {
         ) => {
           const result = await client.getTransactionsByCategory(id, {
             budgetId: options.budget,
-            sinceDate: options.since,
+            sinceDate: options.since ? parseDate(options.since) : undefined,
             type: options.type,
             lastKnowledgeOfServer: options.lastKnowledge,
           });
