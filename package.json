@@ -47,16 +47,16 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@napi-rs/keyring": "^1.2.0",
-    "commander": "^12.0.0",
-    "conf": "^12.0.0",
+    "commander": "^14.0.2",
+    "conf": "^15.0.2",
     "dayjs": "^1.11.19",
     "ynab": "^2.10.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.3.11",
     "@types/bun": "latest",
-    "oxlint": "^0.16.0",
+    "oxlint": "^1.38.0",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
