@@ -5,6 +5,24 @@ import { client } from '../lib/api-client.js';
 import { auth } from '../lib/auth.js';
 import { convertMilliunitsToAmounts } from '../lib/utils.js';
 
+const toolRegistry = [
+  { name: 'list_budgets', description: 'List all budgets in the YNAB account' },
+  { name: 'get_budget', description: 'Get detailed information about a specific budget' },
+  { name: 'list_accounts', description: 'List all accounts in a budget' },
+  { name: 'get_account', description: 'Get detailed information about a specific account' },
+  { name: 'list_categories', description: 'List all category groups and categories in a budget' },
+  { name: 'get_category', description: 'Get detailed information about a specific category' },
+  { name: 'list_transactions', description: 'List transactions with optional filtering' },
+  { name: 'get_transaction', description: 'Get detailed information about a specific transaction' },
+  { name: 'list_transactions_by_account', description: 'List transactions for a specific account' },
+  { name: 'list_transactions_by_category', description: 'List transactions for a specific category' },
+  { name: 'list_payees', description: 'List all payees in a budget' },
+  { name: 'get_budget_month', description: 'Get budget details for a specific month' },
+  { name: 'list_scheduled_transactions', description: 'List all scheduled transactions in a budget' },
+  { name: 'get_user', description: 'Get information about the authenticated user' },
+  { name: 'check_auth', description: 'Check if YNAB authentication is configured' },
+];
+
 const server = new McpServer({
   name: 'ynab',
   version: '1.0.0',
@@ -148,6 +166,23 @@ server.tool(
   'Check if YNAB authentication is configured',
   {},
   async () => jsonResponse({ authenticated: await auth.isAuthenticated() })
+);
+
+server.tool(
+  'search_tools',
+  'Search for available tools by name or description using regex. Returns matching tool names.',
+  {
+    query: z.string().describe('Regex pattern to match against tool names and descriptions (case-insensitive)'),
+  },
+  async ({ query }) => {
+    try {
+      const pattern = new RegExp(query, 'i');
+      const matches = toolRegistry.filter((t) => pattern.test(t.name) || pattern.test(t.description));
+      return jsonResponse({ tools: matches });
+    } catch {
+      return jsonResponse({ error: 'Invalid regex pattern' });
+    }
+  }
 );
 
 export async function runMcpServer() {
