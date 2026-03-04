@@ -8,18 +8,31 @@ import { amountToMilliunits, convertMilliunitsToAmounts } from '../lib/utils.js'
 const toolRegistry = [
   { name: 'list_budgets', description: 'List all budgets in the YNAB account' },
   { name: 'get_budget', description: 'Get detailed information about a specific budget' },
+  { name: 'get_budget_settings', description: 'Get budget settings (date format, currency format, etc.)' },
   { name: 'list_accounts', description: 'List all accounts in a budget' },
   { name: 'get_account', description: 'Get detailed information about a specific account' },
   { name: 'list_categories', description: 'List all category groups and categories in a budget' },
   { name: 'get_category', description: 'Get detailed information about a specific category' },
   { name: 'update_category', description: 'Update category name, note, group, or goal target' },
+  { name: 'update_month_category', description: 'Set the budgeted amount for a category in a specific month' },
   { name: 'list_transactions', description: 'List transactions with optional filtering' },
   { name: 'get_transaction', description: 'Get detailed information about a specific transaction' },
+  { name: 'create_transaction', description: 'Create a new transaction' },
+  { name: 'update_transaction', description: 'Update an existing transaction' },
+  { name: 'delete_transaction', description: 'Delete a transaction' },
+  { name: 'import_transactions', description: 'Trigger import of linked bank transactions' },
   { name: 'list_transactions_by_account', description: 'List transactions for a specific account' },
   { name: 'list_transactions_by_category', description: 'List transactions for a specific category' },
+  { name: 'list_transactions_by_payee', description: 'List transactions for a specific payee' },
   { name: 'list_payees', description: 'List all payees in a budget' },
+  { name: 'update_payee', description: 'Rename a payee' },
+  { name: 'list_payee_locations', description: 'List locations for a specific payee' },
+  { name: 'list_budget_months', description: 'List all budget months' },
   { name: 'get_budget_month', description: 'Get budget details for a specific month' },
   { name: 'list_scheduled_transactions', description: 'List all scheduled transactions in a budget' },
+  { name: 'get_scheduled_transaction', description: 'Get a single scheduled transaction' },
+  { name: 'delete_scheduled_transaction', description: 'Delete a scheduled transaction' },
+  { name: 'raw_api_call', description: 'Make a direct YNAB API call' },
   { name: 'get_user', description: 'Get information about the authenticated user' },
   { name: 'check_auth', description: 'Check if YNAB authentication is configured' },
 ];
@@ -49,6 +62,13 @@ server.tool(
   'Get detailed information about a specific budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getBudget(budgetId))
+);
+
+server.tool(
+  'get_budget_settings',
+  'Get budget settings (date format, currency format, etc.)',
+  { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
+  async ({ budgetId }) => jsonResponse(await client.getBudgetSettings(budgetId))
 );
 
 server.tool(
@@ -107,6 +127,21 @@ server.tool(
 );
 
 server.tool(
+  'update_month_category',
+  'Set the budgeted amount for a category in a specific month',
+  {
+    categoryId: z.string().describe('Category ID'),
+    month: z.string().describe('Budget month (YYYY-MM-DD, day is ignored)'),
+    budgeted: z.number().describe('Budgeted amount in dollars'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ categoryId, month, budgeted, budgetId }) =>
+    currencyResponse(
+      await client.updateMonthCategory(month, categoryId, { category: { budgeted: amountToMilliunits(budgeted) } }, budgetId)
+    )
+);
+
+server.tool(
   'list_transactions',
   'List transactions with optional filtering',
   {
@@ -126,6 +161,86 @@ server.tool(
     budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
   },
   async ({ transactionId, budgetId }) => currencyResponse(await client.getTransaction(transactionId, budgetId))
+);
+
+server.tool(
+  'create_transaction',
+  'Create a new transaction',
+  {
+    accountId: z.string().describe('Account ID'),
+    date: z.string().describe('Transaction date (YYYY-MM-DD)'),
+    amount: z.number().describe('Amount in dollars (negative for outflow, positive for inflow)'),
+    payeeName: z.string().optional().describe('Payee name (creates new payee if not found)'),
+    payeeId: z.string().optional().describe('Payee ID'),
+    categoryId: z.string().optional().describe('Category ID'),
+    memo: z.string().optional().describe('Transaction memo'),
+    cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional().describe('Cleared status'),
+    approved: z.boolean().optional().describe('Whether the transaction is approved'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ accountId, date, amount, payeeName, payeeId, categoryId, memo, cleared, approved, budgetId }) => {
+    const transaction: Record<string, unknown> = {
+      account_id: accountId,
+      date,
+      amount: amountToMilliunits(amount),
+    };
+    if (payeeName !== undefined) transaction.payee_name = payeeName;
+    if (payeeId !== undefined) transaction.payee_id = payeeId;
+    if (categoryId !== undefined) transaction.category_id = categoryId;
+    if (memo !== undefined) transaction.memo = memo;
+    if (cleared !== undefined) transaction.cleared = cleared;
+    if (approved !== undefined) transaction.approved = approved;
+    return currencyResponse(await client.createTransaction({ transaction }, budgetId));
+  }
+);
+
+server.tool(
+  'update_transaction',
+  'Update an existing transaction',
+  {
+    transactionId: z.string().describe('Transaction ID'),
+    accountId: z.string().optional().describe('Account ID'),
+    date: z.string().optional().describe('Transaction date (YYYY-MM-DD)'),
+    amount: z.number().optional().describe('Amount in dollars (negative for outflow, positive for inflow)'),
+    payeeName: z.string().optional().describe('Payee name'),
+    payeeId: z.string().optional().describe('Payee ID'),
+    categoryId: z.string().optional().describe('Category ID'),
+    memo: z.string().optional().describe('Transaction memo'),
+    cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional().describe('Cleared status'),
+    approved: z.boolean().optional().describe('Whether the transaction is approved'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ transactionId, accountId, date, amount, payeeName, payeeId, categoryId, memo, cleared, approved, budgetId }) => {
+    const transaction: Record<string, unknown> = {};
+    if (accountId !== undefined) transaction.account_id = accountId;
+    if (date !== undefined) transaction.date = date;
+    if (amount !== undefined) transaction.amount = amountToMilliunits(amount);
+    if (payeeName !== undefined) transaction.payee_name = payeeName;
+    if (payeeId !== undefined) transaction.payee_id = payeeId;
+    if (categoryId !== undefined) transaction.category_id = categoryId;
+    if (memo !== undefined) transaction.memo = memo;
+    if (cleared !== undefined) transaction.cleared = cleared;
+    if (approved !== undefined) transaction.approved = approved;
+    return currencyResponse(await client.updateTransaction(transactionId, { transaction }, budgetId));
+  }
+);
+
+server.tool(
+  'delete_transaction',
+  'Delete a transaction',
+  {
+    transactionId: z.string().describe('Transaction ID'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ transactionId, budgetId }) =>
+    currencyResponse(await client.deleteTransaction(transactionId, budgetId))
+);
+
+server.tool(
+  'import_transactions',
+  'Trigger import of linked bank transactions',
+  { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
+  async ({ budgetId }) => jsonResponse(await client.importTransactions(budgetId))
 );
 
 server.tool(
@@ -153,10 +268,52 @@ server.tool(
 );
 
 server.tool(
+  'list_transactions_by_payee',
+  'List transactions for a specific payee',
+  {
+    payeeId: z.string().describe('Payee ID'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+    sinceDate: z.string().optional().describe('Only return transactions on or after this date (YYYY-MM-DD)'),
+  },
+  async ({ payeeId, budgetId, sinceDate }) =>
+    currencyResponse(await client.getTransactionsByPayee(payeeId, { budgetId, sinceDate }))
+);
+
+server.tool(
   'list_payees',
   'List all payees in a budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => jsonResponse(await client.getPayees(budgetId))
+);
+
+server.tool(
+  'update_payee',
+  'Rename a payee',
+  {
+    payeeId: z.string().describe('Payee ID'),
+    name: z.string().describe('New payee name'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ payeeId, name, budgetId }) =>
+    jsonResponse(await client.updatePayee(payeeId, { payee: { name } }, budgetId))
+);
+
+server.tool(
+  'list_payee_locations',
+  'List locations for a specific payee',
+  {
+    payeeId: z.string().describe('Payee ID'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ payeeId, budgetId }) =>
+    jsonResponse(await client.getPayeeLocationsByPayee(payeeId, budgetId))
+);
+
+server.tool(
+  'list_budget_months',
+  'List all budget months',
+  { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
+  async ({ budgetId }) => currencyResponse(await client.getBudgetMonths(budgetId))
 );
 
 server.tool(
@@ -174,6 +331,41 @@ server.tool(
   'List all scheduled transactions in a budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getScheduledTransactions(budgetId))
+);
+
+server.tool(
+  'get_scheduled_transaction',
+  'Get a single scheduled transaction',
+  {
+    scheduledTransactionId: z.string().describe('Scheduled transaction ID'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ scheduledTransactionId, budgetId }) =>
+    currencyResponse(await client.getScheduledTransaction(scheduledTransactionId, budgetId))
+);
+
+server.tool(
+  'delete_scheduled_transaction',
+  'Delete a scheduled transaction',
+  {
+    scheduledTransactionId: z.string().describe('Scheduled transaction ID'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ scheduledTransactionId, budgetId }) =>
+    currencyResponse(await client.deleteScheduledTransaction(scheduledTransactionId, budgetId))
+);
+
+server.tool(
+  'raw_api_call',
+  'Make a direct YNAB API call',
+  {
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).describe('HTTP method'),
+    path: z.string().describe('API path (e.g., /budgets/{budget_id}/accounts). {budget_id} is replaced with the default budget.'),
+    data: z.record(z.unknown()).optional().describe('Request body for POST/PUT/PATCH'),
+    budgetId: z.string().optional().describe('Budget ID for {budget_id} replacement (uses default if not specified)'),
+  },
+  async ({ method, path, data, budgetId }) =>
+    jsonResponse(await client.rawApiCall(method, path, data, budgetId))
 );
 
 server.tool(
