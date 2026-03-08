@@ -137,6 +137,133 @@ export function applyTransactionFilters<T extends TransactionLike>(
   return filtered;
 }
 
+export type SummaryTransaction = TransactionLike & {
+  payee_id?: string | null;
+  payee_name?: string | null;
+  category_id?: string | null;
+  category_name?: string | null;
+  account_id: string;
+  transfer_account_id?: string | null;
+  transfer_transaction_id?: string | null;
+};
+
+interface BreakdownEntry {
+  count: number;
+  total_amount: number;
+}
+
+export function summarizeTransactions(
+  transactions: SummaryTransaction[],
+  options?: { top?: number }
+) {
+  let totalAmount = 0;
+  const dates: string[] = [];
+  const byPayee = new Map<string, { payee_id: string | null; payee_name: string | null } & BreakdownEntry>();
+  const byCategory = new Map<string, { category_id: string | null; category_name: string | null } & BreakdownEntry>();
+  const byCleared = new Map<string, BreakdownEntry>();
+  const byApproval = new Map<string, BreakdownEntry>();
+
+  for (const t of transactions) {
+    totalAmount += t.amount;
+    dates.push(t.date);
+
+    const payeeKey = t.payee_id || t.payee_name || '(none)';
+    const payeeEntry = byPayee.get(payeeKey) || {
+      payee_id: t.payee_id || null,
+      payee_name: t.payee_name || null,
+      count: 0,
+      total_amount: 0,
+    };
+    payeeEntry.count++;
+    payeeEntry.total_amount += t.amount;
+    byPayee.set(payeeKey, payeeEntry);
+
+    const catKey = t.category_id || t.category_name || '(uncategorized)';
+    const catEntry = byCategory.get(catKey) || {
+      category_id: t.category_id || null,
+      category_name: t.category_name || null,
+      count: 0,
+      total_amount: 0,
+    };
+    catEntry.count++;
+    catEntry.total_amount += t.amount;
+    byCategory.set(catKey, catEntry);
+
+    const clearedEntry = byCleared.get(t.cleared) || { count: 0, total_amount: 0 };
+    clearedEntry.count++;
+    clearedEntry.total_amount += t.amount;
+    byCleared.set(t.cleared, clearedEntry);
+
+    const approvalKey = String(t.approved);
+    const approvalEntry = byApproval.get(approvalKey) || { count: 0, total_amount: 0 };
+    approvalEntry.count++;
+    approvalEntry.total_amount += t.amount;
+    byApproval.set(approvalKey, approvalEntry);
+  }
+
+  const sortByAbsAmount = <T extends BreakdownEntry>(entries: T[]): T[] =>
+    entries.sort((a, b) => Math.abs(b.total_amount) - Math.abs(a.total_amount));
+
+  const truncate = <T extends BreakdownEntry>(entries: T[], rollupFactory: (entry: BreakdownEntry) => T): T[] => {
+    const top = options?.top;
+    if (!top || top <= 0 || entries.length <= top) return entries;
+    const kept = entries.slice(0, top);
+    const rest = entries.slice(top);
+    const rollup = rollupFactory({
+      count: rest.reduce((sum, e) => sum + e.count, 0),
+      total_amount: rest.reduce((sum, e) => sum + e.total_amount, 0),
+    });
+    return [...kept, rollup];
+  };
+
+  const payeeBreakdown = sortByAbsAmount([...byPayee.values()]);
+  const categoryBreakdown = sortByAbsAmount([...byCategory.values()]);
+
+  return {
+    total_count: transactions.length,
+    total_amount: totalAmount,
+    date_range: dates.length > 0
+      ? {
+          from: dates.reduce((a, b) => (a < b ? a : b)),
+          to: dates.reduce((a, b) => (a > b ? a : b)),
+        }
+      : null,
+    by_payee: truncate(payeeBreakdown, (e) => ({ payee_id: null, payee_name: '(other)', ...e })),
+    by_category: truncate(categoryBreakdown, (e) => ({ category_id: null, category_name: '(other)', ...e })),
+    by_cleared_status: [...byCleared.entries()].map(([status, entry]) => ({ status, ...entry })),
+    by_approval_status: [...byApproval.entries()].map(([approved, entry]) => ({ approved: approved === 'true', ...entry })),
+  };
+}
+
+export function findTransferCandidates(
+  source: SummaryTransaction,
+  allTransactions: SummaryTransaction[],
+  options: { maxDays: number }
+) {
+  const sourceAmount = Math.abs(source.amount);
+  const sourceDateMs = new Date(source.date).getTime();
+  const msPerDay = 86400000;
+
+  function daysBetween(t: SummaryTransaction): number {
+    return Math.abs(new Date(t.date).getTime() - sourceDateMs) / msPerDay;
+  }
+
+  return allTransactions
+    .filter((t) => {
+      if (t.account_id === source.account_id) return false;
+      if (Math.abs(t.amount) !== sourceAmount) return false;
+      if (Math.sign(t.amount) === Math.sign(source.amount)) return false;
+      return daysBetween(t) <= options.maxDays;
+    })
+    .map((t) => ({
+      transaction: t,
+      already_linked: !!t.transfer_transaction_id,
+      date_difference_days: Math.round(daysBetween(t)),
+      has_transfer_payee: !!t.payee_name?.startsWith('Transfer :'),
+    }))
+    .sort((a, b) => a.date_difference_days - b.date_difference_days);
+}
+
 export function applyFieldSelection<T>(items: T[], fields?: string): Partial<T>[] {
   if (!fields) return items;
 

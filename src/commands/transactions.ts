@@ -2,16 +2,42 @@ import { Command } from 'commander';
 import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { YnabCliError } from '../lib/errors.js';
+import dayjs from 'dayjs';
 import {
   amountToMilliunits,
   applyTransactionFilters,
   applyFieldSelection,
+  summarizeTransactions,
+  findTransferCandidates,
   type TransactionLike,
+  type SummaryTransaction,
 } from '../lib/utils.js';
 import { withErrorHandling, requireConfirmation, buildUpdateObject } from '../lib/command-utils.js';
 import { validateTransactionSplits, validateBatchUpdates } from '../lib/schemas.js';
 import { parseDate, todayDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
+
+async function fetchTransactions(options: {
+  budget?: string;
+  account?: string;
+  category?: string;
+  payee?: string;
+  since?: string;
+  type?: string;
+  lastKnowledge?: number;
+}) {
+  const params = {
+    budgetId: options.budget,
+    sinceDate: options.since ? parseDate(options.since) : undefined,
+    type: options.type,
+    lastKnowledgeOfServer: options.lastKnowledge,
+  };
+
+  if (options.account) return client.getTransactionsByAccount(options.account, params);
+  if (options.category) return client.getTransactionsByCategory(options.category, params);
+  if (options.payee) return client.getTransactionsByPayee(options.payee, params);
+  return client.getTransactions(params);
+}
 
 interface TransactionOptions {
   account?: string;
@@ -70,6 +96,8 @@ export function createTransactionsCommand(): Command {
       '--fields <fields>',
       'Comma-separated list of fields to include (e.g., id,date,amount,memo)'
     )
+    .option('--last-knowledge <number>', 'Last server knowledge for delta requests. When used, output includes server_knowledge.', parseInt)
+    .option('--limit <number>', 'Maximum number of transactions to return', parseInt)
     .action(
       withErrorHandling(
         async (
@@ -86,25 +114,14 @@ export function createTransactionsCommand(): Command {
             minAmount?: number;
             maxAmount?: number;
             fields?: string;
+            lastKnowledge?: number;
+            limit?: number;
           } & CommandOptions
         ) => {
-          const params = {
-            budgetId: options.budget,
-            sinceDate: options.since ? parseDate(options.since) : undefined,
-            type: options.type,
-          };
-
-          const result = options.account
-            ? await client.getTransactionsByAccount(options.account, params)
-            : options.category
-              ? await client.getTransactionsByCategory(options.category, params)
-              : options.payee
-                ? await client.getTransactionsByPayee(options.payee, params)
-                : await client.getTransactions(params);
-
+          const result = await fetchTransactions(options);
           const transactions = result?.transactions || [];
 
-          const filtered = applyTransactionFilters(transactions as TransactionLike[], {
+          let filtered = applyTransactionFilters(transactions as TransactionLike[], {
             until: options.until ? parseDate(options.until) : undefined,
             approved: options.approved,
             status: options.status,
@@ -112,9 +129,17 @@ export function createTransactionsCommand(): Command {
             maxAmount: options.maxAmount,
           });
 
+          if (options.limit && options.limit > 0) {
+            filtered = filtered.slice(0, options.limit);
+          }
+
           const selected = applyFieldSelection(filtered, options.fields);
 
-          outputJson(selected);
+          if (options.lastKnowledge !== undefined) {
+            outputJson({ transactions: selected, server_knowledge: result?.server_knowledge });
+          } else {
+            outputJson(selected);
+          }
         }
       )
     );
@@ -431,6 +456,103 @@ export function createTransactionsCommand(): Command {
           const filteredTransactions = applyFieldSelection(transactions, options.fields);
 
           outputJson(filteredTransactions);
+        }
+      )
+    );
+
+  cmd
+    .command('summary')
+    .description('Summarize transactions with aggregate counts by payee, category, and status')
+    .option('-b, --budget <id>', 'Budget ID')
+    .option('--account <id>', 'Filter by account ID')
+    .option('--category <id>', 'Filter by category ID')
+    .option('--payee <id>', 'Filter by payee ID')
+    .option('--since <date>', 'Filter transactions since date')
+    .option('--until <date>', 'Filter transactions until date')
+    .option('--type <type>', 'Filter by transaction type')
+    .option('--approved <value>', 'Filter by approval status: true or false')
+    .option(
+      '--status <statuses>',
+      'Filter by cleared status: cleared, uncleared, reconciled (comma-separated)'
+    )
+    .option('--min-amount <amount>', 'Minimum amount in currency units', parseFloat)
+    .option('--max-amount <amount>', 'Maximum amount in currency units', parseFloat)
+    .option('--top <number>', 'Limit payee/category breakdowns to top N entries', parseInt)
+    .action(
+      withErrorHandling(
+        async (
+          options: {
+            budget?: string;
+            account?: string;
+            category?: string;
+            payee?: string;
+            since?: string;
+            until?: string;
+            type?: string;
+            approved?: string;
+            status?: string;
+            minAmount?: number;
+            maxAmount?: number;
+            top?: number;
+          } & CommandOptions
+        ) => {
+          const result = await fetchTransactions(options);
+          const transactions = result?.transactions || [];
+
+          const filtered = applyTransactionFilters(transactions as TransactionLike[], {
+            until: options.until ? parseDate(options.until) : undefined,
+            approved: options.approved,
+            status: options.status,
+            minAmount: options.minAmount,
+            maxAmount: options.maxAmount,
+          });
+
+          const summary = summarizeTransactions(
+            filtered as SummaryTransaction[],
+            options.top ? { top: options.top } : undefined
+          );
+          outputJson(summary);
+        }
+      )
+    );
+
+  cmd
+    .command('find-transfers')
+    .description('Find candidate transfer matches for a transaction across accounts')
+    .argument('<id>', 'Transaction ID')
+    .option('-b, --budget <id>', 'Budget ID')
+    .option('--days <number>', 'Maximum date difference in days (default: 3)', parseInt)
+    .option('--since <date>', 'Search transactions since date (defaults to source date minus --days)')
+    .action(
+      withErrorHandling(
+        async (
+          id: string,
+          options: {
+            budget?: string;
+            days?: number;
+            since?: string;
+          } & CommandOptions
+        ) => {
+          const maxDays = options.days ?? 3;
+          const source = await client.getTransaction(id, options.budget);
+
+          const sinceDate = options.since
+            ? parseDate(options.since)
+            : dayjs(source.date).subtract(maxDays, 'day').format('YYYY-MM-DD');
+
+          const result = await client.getTransactions({
+            budgetId: options.budget,
+            sinceDate,
+          });
+
+          const allTransactions = result?.transactions || [];
+          const candidates = findTransferCandidates(
+            source as SummaryTransaction,
+            allTransactions as SummaryTransaction[],
+            { maxDays }
+          );
+
+          outputJson({ source, candidates });
         }
       )
     );

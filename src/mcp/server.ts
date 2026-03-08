@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { client } from '../lib/api-client.js';
 import { auth } from '../lib/auth.js';
-import { amountToMilliunits, applyFieldSelection, convertMilliunitsToAmounts } from '../lib/utils.js';
+import { amountToMilliunits, applyFieldSelection, applyTransactionFilters, convertMilliunitsToAmounts, summarizeTransactions, findTransferCandidates, type SummaryTransaction, type TransactionLike } from '../lib/utils.js';
 
 const toolRegistry = [
   { name: 'list_budgets', description: 'List all budgets in the YNAB account' },
@@ -22,6 +22,8 @@ const toolRegistry = [
   { name: 'delete_transaction', description: 'Delete a transaction' },
   { name: 'import_transactions', description: 'Trigger import of linked bank transactions' },
   { name: 'batch_update_transactions', description: 'Update multiple transactions in a single API call' },
+  { name: 'summarize_transactions', description: 'Get aggregate summary of transactions by payee, category, and status' },
+  { name: 'find_transfer_candidates', description: 'Find candidate transfer matches for a transaction across accounts' },
   { name: 'list_transactions_by_account', description: 'List transactions for a specific account' },
   { name: 'list_transactions_by_category', description: 'List transactions for a specific category' },
   { name: 'list_transactions_by_payee', description: 'List transactions for a specific payee' },
@@ -149,9 +151,17 @@ server.tool(
     budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
     sinceDate: z.string().optional().describe('Only return transactions on or after this date (YYYY-MM-DD)'),
     type: z.enum(['uncategorized', 'unapproved']).optional().describe('Filter by transaction type'),
+    lastKnowledgeOfServer: z.number().optional().describe('Delta sync: only return changes since this server knowledge value. Response includes server_knowledge for next call.'),
+    limit: z.number().optional().describe('Maximum number of transactions to return'),
+    fields: z.string().optional().describe('Comma-separated list of fields to include (e.g., id,date,amount,memo)'),
   },
-  async ({ budgetId, sinceDate, type }) =>
-    currencyResponse(await client.getTransactions({ budgetId, sinceDate, type }))
+  async ({ budgetId, sinceDate, type, lastKnowledgeOfServer, limit, fields }) => {
+    const result = await client.getTransactions({ budgetId, sinceDate, type, lastKnowledgeOfServer });
+    let transactions = result?.transactions || [];
+    if (limit && limit > 0) transactions = transactions.slice(0, limit);
+    const selected = fields ? applyFieldSelection(transactions, fields) : transactions;
+    return currencyResponse({ transactions: selected, server_knowledge: result?.server_knowledge });
+  }
 );
 
 server.tool(
@@ -275,6 +285,66 @@ server.tool(
         budgetId
       )
     );
+  }
+);
+
+server.tool(
+  'summarize_transactions',
+  'Get aggregate summary of transactions by payee, category, and status',
+  {
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+    sinceDate: z.string().optional().describe('Only return transactions on or after this date (YYYY-MM-DD)'),
+    untilDate: z.string().optional().describe('Only return transactions on or before this date (YYYY-MM-DD)'),
+    type: z.enum(['uncategorized', 'unapproved']).optional().describe('Filter by transaction type'),
+    approved: z.enum(['true', 'false']).optional().describe('Filter by approval status'),
+    status: z.string().optional().describe('Filter by cleared status: cleared, uncleared, reconciled (comma-separated)'),
+    minAmount: z.number().optional().describe('Minimum amount in dollars'),
+    maxAmount: z.number().optional().describe('Maximum amount in dollars'),
+    top: z.number().optional().describe('Limit payee/category breakdowns to top N entries'),
+  },
+  async ({ budgetId, sinceDate, untilDate, type, approved, status, minAmount, maxAmount, top }) => {
+    const result = await client.getTransactions({ budgetId, sinceDate, type });
+    const transactions = result?.transactions || [];
+    const filtered = applyTransactionFilters(transactions as TransactionLike[], {
+      until: untilDate,
+      approved,
+      status,
+      minAmount,
+      maxAmount,
+    });
+    const summary = summarizeTransactions(
+      filtered as SummaryTransaction[],
+      top ? { top } : undefined
+    );
+    return currencyResponse(summary);
+  }
+);
+
+server.tool(
+  'find_transfer_candidates',
+  'Find candidate transfer matches for a transaction across accounts',
+  {
+    transactionId: z.string().describe('Transaction ID to find transfers for'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+    maxDays: z.number().optional().describe('Maximum date difference in days (default: 3)'),
+    sinceDate: z.string().optional().describe('Search transactions since date (defaults to source date minus maxDays)'),
+  },
+  async ({ transactionId, budgetId, maxDays: maxDaysParam, sinceDate }) => {
+    const days = maxDaysParam ?? 3;
+    const source = await client.getTransaction(transactionId, budgetId);
+    if (!sinceDate) {
+      const d = new Date(source.date);
+      d.setDate(d.getDate() - days);
+      sinceDate = d.toISOString().split('T')[0];
+    }
+    const result = await client.getTransactions({ budgetId, sinceDate });
+    const allTransactions = result?.transactions || [];
+    const candidates = findTransferCandidates(
+      source as SummaryTransaction,
+      allTransactions as SummaryTransaction[],
+      { maxDays: days }
+    );
+    return currencyResponse({ source, candidates });
   }
 );
 
