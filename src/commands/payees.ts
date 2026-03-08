@@ -3,6 +3,7 @@ import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { YnabCliError } from '../lib/errors.js';
 import { withErrorHandling } from '../lib/command-utils.js';
+import { applyFieldSelection } from '../lib/utils.js';
 import { parseDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
@@ -78,6 +79,10 @@ export function createPayeesCommand(): Command {
     .option('--since <date>', 'Filter transactions since date')
     .option('--type <type>', 'Filter by transaction type')
     .option('--last-knowledge <number>', 'Last knowledge of server', parseInt)
+    .option(
+      '--fields <fields>',
+      'Comma-separated list of fields to include (e.g., id,date,amount,memo)'
+    )
     .action(
       withErrorHandling(
         async (
@@ -87,6 +92,7 @@ export function createPayeesCommand(): Command {
             since?: string;
             type?: string;
             lastKnowledge?: number;
+            fields?: string;
           } & CommandOptions
         ) => {
           const result = await client.getTransactionsByPayee(id, {
@@ -95,7 +101,8 @@ export function createPayeesCommand(): Command {
             type: options.type,
             lastKnowledgeOfServer: options.lastKnowledge,
           });
-          outputJson(result?.transactions);
+          const transactions = result?.transactions || [];
+          outputJson(applyFieldSelection(transactions, options.fields));
         }
       )
     );

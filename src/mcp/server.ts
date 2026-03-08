@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { client } from '../lib/api-client.js';
 import { auth } from '../lib/auth.js';
-import { amountToMilliunits, convertMilliunitsToAmounts } from '../lib/utils.js';
+import { amountToMilliunits, applyFieldSelection, convertMilliunitsToAmounts } from '../lib/utils.js';
 
 const toolRegistry = [
   { name: 'list_budgets', description: 'List all budgets in the YNAB account' },
@@ -21,6 +21,7 @@ const toolRegistry = [
   { name: 'update_transaction', description: 'Update an existing transaction' },
   { name: 'delete_transaction', description: 'Delete a transaction' },
   { name: 'import_transactions', description: 'Trigger import of linked bank transactions' },
+  { name: 'batch_update_transactions', description: 'Update multiple transactions in a single API call' },
   { name: 'list_transactions_by_account', description: 'List transactions for a specific account' },
   { name: 'list_transactions_by_category', description: 'List transactions for a specific category' },
   { name: 'list_transactions_by_payee', description: 'List transactions for a specific payee' },
@@ -244,15 +245,53 @@ server.tool(
 );
 
 server.tool(
+  'batch_update_transactions',
+  'Update multiple transactions in a single API call. Amounts in dollars.',
+  {
+    transactions: z.array(z.object({
+      id: z.string().optional().nullable().describe('Transaction ID (required if no import_id)'),
+      import_id: z.string().optional().nullable().describe('Import ID (required if no id)'),
+      account_id: z.string().optional().describe('Account ID'),
+      date: z.string().optional().describe('Transaction date (YYYY-MM-DD)'),
+      amount: z.number().optional().describe('Amount in dollars (negative for outflow)'),
+      payee_id: z.string().optional().nullable().describe('Payee ID'),
+      payee_name: z.string().optional().nullable().describe('Payee name'),
+      category_id: z.string().optional().nullable().describe('Category ID'),
+      memo: z.string().optional().nullable().describe('Transaction memo'),
+      cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional().describe('Cleared status'),
+      approved: z.boolean().optional().describe('Whether the transaction is approved'),
+      flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional().nullable().describe('Flag color'),
+    })).describe('Array of transaction updates'),
+    budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
+  },
+  async ({ transactions, budgetId }) => {
+    const transactionsInMilliunits = transactions.map((update) => ({
+      ...update,
+      ...(update.amount !== undefined ? { amount: amountToMilliunits(update.amount) } : {}),
+    }));
+    return currencyResponse(
+      await client.updateTransactions(
+        { transactions: transactionsInMilliunits as Parameters<typeof client.updateTransactions>[0]['transactions'] },
+        budgetId
+      )
+    );
+  }
+);
+
+server.tool(
   'list_transactions_by_account',
   'List transactions for a specific account',
   {
     accountId: z.string().describe('Account ID'),
     budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
     sinceDate: z.string().optional().describe('Only return transactions on or after this date (YYYY-MM-DD)'),
+    fields: z.string().optional().describe('Comma-separated list of fields to include (e.g., id,date,amount,memo)'),
   },
-  async ({ accountId, budgetId, sinceDate }) =>
-    currencyResponse(await client.getTransactionsByAccount(accountId, { budgetId, sinceDate }))
+  async ({ accountId, budgetId, sinceDate, fields }) => {
+    const result = await client.getTransactionsByAccount(accountId, { budgetId, sinceDate });
+    if (!fields) return currencyResponse(result);
+    return currencyResponse(applyFieldSelection(result?.transactions || [], fields));
+  }
 );
 
 server.tool(
@@ -262,9 +301,13 @@ server.tool(
     categoryId: z.string().describe('Category ID'),
     budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
     sinceDate: z.string().optional().describe('Only return transactions on or after this date (YYYY-MM-DD)'),
+    fields: z.string().optional().describe('Comma-separated list of fields to include (e.g., id,date,amount,memo)'),
   },
-  async ({ categoryId, budgetId, sinceDate }) =>
-    currencyResponse(await client.getTransactionsByCategory(categoryId, { budgetId, sinceDate }))
+  async ({ categoryId, budgetId, sinceDate, fields }) => {
+    const result = await client.getTransactionsByCategory(categoryId, { budgetId, sinceDate });
+    if (!fields) return currencyResponse(result);
+    return currencyResponse(applyFieldSelection(result?.transactions || [], fields));
+  }
 );
 
 server.tool(
@@ -274,9 +317,13 @@ server.tool(
     payeeId: z.string().describe('Payee ID'),
     budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
     sinceDate: z.string().optional().describe('Only return transactions on or after this date (YYYY-MM-DD)'),
+    fields: z.string().optional().describe('Comma-separated list of fields to include (e.g., id,date,amount,memo)'),
   },
-  async ({ payeeId, budgetId, sinceDate }) =>
-    currencyResponse(await client.getTransactionsByPayee(payeeId, { budgetId, sinceDate }))
+  async ({ payeeId, budgetId, sinceDate, fields }) => {
+    const result = await client.getTransactionsByPayee(payeeId, { budgetId, sinceDate });
+    if (!fields) return currencyResponse(result);
+    return currencyResponse(applyFieldSelection(result?.transactions || [], fields));
+  }
 );
 
 server.tool(

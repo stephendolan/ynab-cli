@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { withErrorHandling } from '../lib/command-utils.js';
+import { applyFieldSelection } from '../lib/utils.js';
 import { parseDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
@@ -38,6 +39,10 @@ export function createAccountsCommand(): Command {
     .option('-b, --budget <id>', 'Budget ID')
     .option('--since <date>', 'Filter transactions since date')
     .option('--type <type>', 'Filter by transaction type')
+    .option(
+      '--fields <fields>',
+      'Comma-separated list of fields to include (e.g., id,date,amount,memo)'
+    )
     .action(
       withErrorHandling(
         async (
@@ -46,6 +51,7 @@ export function createAccountsCommand(): Command {
             budget?: string;
             since?: string;
             type?: string;
+            fields?: string;
           } & CommandOptions
         ) => {
           const result = await client.getTransactionsByAccount(id, {
@@ -53,7 +59,8 @@ export function createAccountsCommand(): Command {
             sinceDate: options.since ? parseDate(options.since) : undefined,
             type: options.type,
           });
-          outputJson(result?.transactions);
+          const transactions = result?.transactions || [];
+          outputJson(applyFieldSelection(transactions, options.fields));
         }
       )
     );

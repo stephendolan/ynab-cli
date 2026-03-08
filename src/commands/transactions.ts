@@ -9,7 +9,7 @@ import {
   type TransactionLike,
 } from '../lib/utils.js';
 import { withErrorHandling, requireConfirmation, buildUpdateObject } from '../lib/command-utils.js';
-import { validateTransactionSplits } from '../lib/schemas.js';
+import { validateTransactionSplits, validateBatchUpdates } from '../lib/schemas.js';
 import { parseDate, todayDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
 
@@ -318,6 +318,44 @@ export function createTransactionsCommand(): Command {
             );
             outputJson(transaction);
           }
+        }
+      )
+    );
+
+  cmd
+    .command('batch-update')
+    .description(
+      'Update multiple transactions in a single API call. Amounts should be in dollars (e.g., -21.40).'
+    )
+    .requiredOption(
+      '--transactions <json>',
+      'JSON array of transaction updates. Each must have "id" or "import_id". Example: [{"id": "tx1", "approved": true, "category_id": "cat1"}]'
+    )
+    .option('-b, --budget <id>', 'Budget ID')
+    .action(
+      withErrorHandling(
+        async (options: { transactions: string; budget?: string } & CommandOptions) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(options.transactions);
+          } catch {
+            throw new YnabCliError('Invalid JSON in --transactions parameter', 400);
+          }
+
+          const updates = validateBatchUpdates(parsed);
+
+          const transactionsInMilliunits = updates.map((update) => ({
+            ...update,
+            ...(update.amount !== undefined
+              ? { amount: amountToMilliunits(update.amount) }
+              : {}),
+          }));
+
+          const result = await client.updateTransactions(
+            { transactions: transactionsInMilliunits as Parameters<typeof client.updateTransactions>[0]['transactions'] },
+            options.budget
+          );
+          outputJson(result);
         }
       )
     );

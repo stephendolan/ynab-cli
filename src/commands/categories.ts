@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { client } from '../lib/api-client.js';
 import { outputJson } from '../lib/output.js';
 import { YnabCliError } from '../lib/errors.js';
-import { amountToMilliunits } from '../lib/utils.js';
+import { amountToMilliunits, applyFieldSelection } from '../lib/utils.js';
 import { withErrorHandling } from '../lib/command-utils.js';
 import { parseDate } from '../lib/dates.js';
 import type { CommandOptions } from '../types/index.js';
@@ -135,6 +135,10 @@ export function createCategoriesCommand(): Command {
     .option('--since <date>', 'Filter transactions since date')
     .option('--type <type>', 'Filter by transaction type')
     .option('--last-knowledge <number>', 'Last knowledge of server', parseInt)
+    .option(
+      '--fields <fields>',
+      'Comma-separated list of fields to include (e.g., id,date,amount,memo)'
+    )
     .action(
       withErrorHandling(
         async (
@@ -144,6 +148,7 @@ export function createCategoriesCommand(): Command {
             since?: string;
             type?: string;
             lastKnowledge?: number;
+            fields?: string;
           } & CommandOptions
         ) => {
           const result = await client.getTransactionsByCategory(id, {
@@ -152,7 +157,8 @@ export function createCategoriesCommand(): Command {
             type: options.type,
             lastKnowledgeOfServer: options.lastKnowledge,
           });
-          outputJson(result?.transactions);
+          const transactions = result?.transactions || [];
+          outputJson(applyFieldSelection(transactions, options.fields));
         }
       )
     );

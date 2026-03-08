@@ -359,6 +359,22 @@ export class YnabClient {
     });
   }
 
+  async updateTransactions(
+    transactions: ynab.PatchTransactionsWrapper,
+    budgetId?: string
+  ) {
+    return this.withErrorHandling(async () => {
+      const api = await this.getApi();
+      const id = await this.getBudgetId(budgetId);
+      const response = await api.transactions.updateTransactions(id, transactions);
+      return {
+        transactions: response.data.transactions,
+        transaction_ids: response.data.transaction_ids,
+        server_knowledge: response.data.server_knowledge,
+      };
+    });
+  }
+
   async deleteTransaction(transactionId: string, budgetId?: string) {
     return this.withErrorHandling(async () => {
       const api = await this.getApi();
