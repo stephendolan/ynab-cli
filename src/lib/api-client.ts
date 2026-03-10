@@ -43,7 +43,7 @@ export class YnabClient {
   }
 
   async getBudgetId(budgetIdOrDefault?: string): Promise<string> {
-    const budgetId = budgetIdOrDefault || config.getDefaultBudget() || process.env.YNAB_BUDGET_ID;
+    const budgetId = (budgetIdOrDefault && budgetIdOrDefault !== 'default' ? budgetIdOrDefault : undefined) || config.getDefaultBudget() || process.env.YNAB_BUDGET_ID;
 
     if (!budgetId) {
       throw new YnabCliError(
