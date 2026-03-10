@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { client } from '../lib/api-client.js';
 import { auth } from '../lib/auth.js';
+import { YnabCliError, sanitizeApiError, sanitizeErrorMessage } from '../lib/errors.js';
 import { amountToMilliunits, applyFieldSelection, applyTransactionFilters, convertMilliunitsToAmounts, summarizeTransactions, findTransferCandidates, type SummaryTransaction, type TransactionLike } from '../lib/utils.js';
 
 const toolRegistry = [
@@ -44,6 +45,43 @@ const server = new McpServer({
   name: 'ynab',
   version: '1.0.0',
 });
+
+function mcpErrorResult(error: unknown) {
+  let errorBody: Record<string, unknown>;
+
+  if (typeof error === 'object' && error !== null && 'error' in error) {
+    const apiError = sanitizeApiError((error as { error: unknown }).error);
+    errorBody = { name: apiError.name, detail: apiError.detail };
+  } else if (error instanceof YnabCliError) {
+    errorBody = { name: 'cli_error', detail: sanitizeErrorMessage(error.message) };
+  } else if (error instanceof Error) {
+    errorBody = { name: error.name, detail: sanitizeErrorMessage(error.message) };
+  } else {
+    errorBody = { name: 'unknown_error', detail: 'An unexpected error occurred' };
+  }
+
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify({ error: errorBody }) }],
+    isError: true as const,
+  };
+}
+
+// Wrap all tool handlers so errors become structured MCP error results
+// instead of propagating as unhandled exceptions
+const _serverTool = server.tool.bind(server);
+(server.tool as unknown) = (...args: unknown[]) => {
+  const handler = args[args.length - 1];
+  if (typeof handler === 'function') {
+    args[args.length - 1] = async (...handlerArgs: unknown[]) => {
+      try {
+        return await (handler as Function)(...handlerArgs);
+      } catch (error) {
+        return mcpErrorResult(error);
+      }
+    };
+  }
+  return (_serverTool as Function).apply(null, args);
+};
 
 function jsonResponse(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
