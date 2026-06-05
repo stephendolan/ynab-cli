@@ -1,29 +1,36 @@
 import { Command } from 'commander';
 import { createInterface } from 'readline';
+import type { Readable, Writable } from 'stream';
 import { auth } from '../lib/auth.js';
 import { outputJson } from '../lib/output.js';
 import { client } from '../lib/api-client.js';
 import { withErrorHandling } from '../lib/command-utils.js';
 import { YnabCliError } from '../lib/errors.js';
 
-function readTokenFromStdin(): Promise<string> {
+const TOKEN_PROMPT = 'Enter YNAB Personal Access Token: ';
+
+export function readTokenFromStdin(stdin: Readable = process.stdin): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk) => { data += chunk; });
-    process.stdin.on('end', () => resolve(data.trim()));
-    process.stdin.on('error', reject);
+    stdin.setEncoding('utf8');
+    stdin.on('data', (chunk) => {
+      data += chunk;
+    });
+    stdin.on('end', () => resolve(data.trim()));
+    stdin.on('error', reject);
   });
 }
 
-function promptForToken(): Promise<string> {
+// Pass the prompt as readline's question() query, not a separate write: readline
+// clears and reprints its line on refresh (ESC[1G ESC[0J), erasing any prompt
+// written outside its knowledge — invisibly on terminals like Warp.
+export function promptForToken(
+  input: Readable = process.stdin,
+  output: Writable = process.stderr
+): Promise<string> {
   return new Promise((resolve) => {
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stderr,
-    });
-    process.stderr.write('Enter YNAB Personal Access Token: ');
-    rl.question('', (answer) => {
+    const rl = createInterface({ input, output });
+    rl.question(TOKEN_PROMPT, (answer) => {
       rl.close();
       resolve(answer.trim());
     });
@@ -50,7 +57,11 @@ export function createAuthCommand(): Command {
         }
 
         if (!token) {
-          throw new YnabCliError('Access token cannot be empty', 400);
+          throw new YnabCliError(
+            'Access token cannot be empty. Provide a token with ' +
+              '`ynab auth login --token <token>` or pipe one in via stdin.',
+            400
+          );
         }
         await auth.setAccessToken(token);
         client.clearApi();
