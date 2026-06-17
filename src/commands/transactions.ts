@@ -311,34 +311,38 @@ export function createTransactionsCommand(): Command {
           if (isAlreadySplit) {
             await client.deleteTransaction(id, options.budget);
 
+            const transaction = {
+              account_id: existingTransaction.account_id,
+              date: existingTransaction.date,
+              amount: existingTransaction.amount,
+              payee_id: existingTransaction.payee_id,
+              payee_name: existingTransaction.payee_name,
+              category_id: null,
+              memo: existingTransaction.memo,
+              cleared: existingTransaction.cleared,
+              approved: existingTransaction.approved,
+              flag_color: existingTransaction.flag_color,
+              subtransactions: splitsInMilliunits,
+            } as unknown as NonNullable<
+              Parameters<typeof client.createTransaction>[0]['transaction']
+            >;
+
             const recreatedTransaction = await client.createTransaction(
-              {
-                transaction: {
-                  account_id: existingTransaction.account_id,
-                  date: existingTransaction.date,
-                  amount: existingTransaction.amount,
-                  payee_id: existingTransaction.payee_id,
-                  payee_name: existingTransaction.payee_name,
-                  category_id: null,
-                  memo: existingTransaction.memo,
-                  cleared: existingTransaction.cleared,
-                  approved: existingTransaction.approved,
-                  flag_color: existingTransaction.flag_color,
-                  subtransactions: splitsInMilliunits,
-                },
-              },
+              { transaction },
               options.budget
             );
             outputJson(recreatedTransaction);
           } else {
+            const transactionData = {
+              category_id: null,
+              subtransactions: splitsInMilliunits,
+            } as unknown as NonNullable<
+              Parameters<typeof client.updateTransaction>[1]['transaction']
+            >;
+
             const transaction = await client.updateTransaction(
               id,
-              {
-                transaction: {
-                  category_id: null,
-                  subtransactions: splitsInMilliunits,
-                },
-              },
+              { transaction: transactionData },
               options.budget
             );
             outputJson(transaction);

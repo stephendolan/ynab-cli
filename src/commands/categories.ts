@@ -88,7 +88,15 @@ export function createCategoriesCommand(): Command {
             updateData.goal_target = amountToMilliunits(options.goalTarget);
           }
 
-          const category = await client.updateCategory(id, { category: updateData }, options.budget);
+          const category = await client.updateCategory(
+            id,
+            {
+              category: updateData as NonNullable<
+                Parameters<typeof client.updateCategory>[1]['category']
+              >,
+            },
+            options.budget
+          );
           outputJson(category);
         }
       )

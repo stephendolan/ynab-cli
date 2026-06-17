@@ -83,6 +83,7 @@ function formatErrorResponse(name: string, detail: string, statusCode: number): 
 
   outputJson({ error: { name, detail: enhancedDetail, statusCode } });
   process.exit(1);
+  throw new Error('process.exit returned unexpectedly');
 }
 
 export function handleYnabError(error: unknown): never {

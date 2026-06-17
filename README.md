@@ -115,8 +115,8 @@ ynab scheduled delete <id>
 ### Raw API Access
 
 ```bash
-ynab api GET /budgets
-ynab api POST /budgets/{budget_id}/transactions --data '{"transaction": {...}}'
+ynab api GET /plans
+ynab api POST /plans/{plan_id}/transactions --data '{"transaction": {...}}'
 ```
 
 ### MCP Server
