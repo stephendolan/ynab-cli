@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { client } from '../lib/api-client.js';
 import { auth } from '../lib/auth.js';
 import { YnabCliError, sanitizeApiError, sanitizeErrorMessage } from '../lib/errors.js';
@@ -83,6 +83,15 @@ const _serverTool = server.tool.bind(server);
   return (_serverTool as Function).apply(null, args);
 };
 
+type ToolRegistrar = (
+  name: string,
+  description: string,
+  paramsSchema: Record<string, unknown>,
+  handler: (args: any) => unknown | Promise<unknown>
+) => unknown;
+
+const tool = server.tool.bind(server) as ToolRegistrar;
+
 function jsonResponse(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
 }
@@ -91,35 +100,35 @@ function currencyResponse(data: unknown) {
   return jsonResponse(convertMilliunitsToAmounts(data));
 }
 
-server.tool(
+tool(
   'list_budgets',
   'List all budgets in the YNAB account',
   { includeAccounts: z.boolean().optional().describe('Include account details') },
   async ({ includeAccounts }) => currencyResponse(await client.getBudgets(includeAccounts))
 );
 
-server.tool(
+tool(
   'get_budget',
   'Get detailed information about a specific budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getBudget(budgetId))
 );
 
-server.tool(
+tool(
   'get_budget_settings',
   'Get budget settings (date format, currency format, etc.)',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => jsonResponse(await client.getBudgetSettings(budgetId))
 );
 
-server.tool(
+tool(
   'list_accounts',
   'List all accounts in a budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getAccounts(budgetId))
 );
 
-server.tool(
+tool(
   'get_account',
   'Get detailed information about a specific account',
   {
@@ -129,14 +138,14 @@ server.tool(
   async ({ accountId, budgetId }) => currencyResponse(await client.getAccount(accountId, budgetId))
 );
 
-server.tool(
+tool(
   'list_categories',
   'List all category groups and categories in a budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getCategories(budgetId))
 );
 
-server.tool(
+tool(
   'get_category',
   'Get detailed information about a specific category',
   {
@@ -146,7 +155,7 @@ server.tool(
   async ({ categoryId, budgetId }) => currencyResponse(await client.getCategory(categoryId, budgetId))
 );
 
-server.tool(
+tool(
   'update_category',
   'Update category name, note, group, or goal target',
   {
@@ -167,7 +176,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'update_month_category',
   'Set the budgeted amount for a category in a specific month',
   {
@@ -182,7 +191,7 @@ server.tool(
     )
 );
 
-server.tool(
+tool(
   'list_transactions',
   'List transactions with optional filtering',
   {
@@ -202,7 +211,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'get_transaction',
   'Get detailed information about a specific transaction',
   {
@@ -212,7 +221,7 @@ server.tool(
   async ({ transactionId, budgetId }) => currencyResponse(await client.getTransaction(transactionId, budgetId))
 );
 
-server.tool(
+tool(
   'create_transaction',
   'Create a new transaction',
   {
@@ -243,7 +252,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'update_transaction',
   'Update an existing transaction',
   {
@@ -274,7 +283,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'delete_transaction',
   'Delete a transaction',
   {
@@ -285,14 +294,14 @@ server.tool(
     currencyResponse(await client.deleteTransaction(transactionId, budgetId))
 );
 
-server.tool(
+tool(
   'import_transactions',
   'Trigger import of linked bank transactions',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => jsonResponse(await client.importTransactions(budgetId))
 );
 
-server.tool(
+tool(
   'batch_update_transactions',
   'Update multiple transactions in a single API call. Amounts in dollars.',
   {
@@ -313,9 +322,9 @@ server.tool(
     budgetId: z.string().optional().describe('Budget ID (uses default if not specified)'),
   },
   async ({ transactions, budgetId }) => {
-    const transactionsInMilliunits = transactions.map((update) => ({
+    const transactionsInMilliunits = transactions.map((update: Record<string, unknown>) => ({
       ...update,
-      ...(update.amount !== undefined ? { amount: amountToMilliunits(update.amount) } : {}),
+      ...(typeof update.amount === 'number' ? { amount: amountToMilliunits(update.amount) } : {}),
     }));
     return currencyResponse(
       await client.updateTransactions(
@@ -326,7 +335,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'summarize_transactions',
   'Get aggregate summary of transactions by payee, category, and status',
   {
@@ -358,7 +367,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'find_transfer_candidates',
   'Find candidate transfer matches for a transaction across accounts',
   {
@@ -386,7 +395,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'list_transactions_by_account',
   'List transactions for a specific account',
   {
@@ -402,7 +411,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'list_transactions_by_category',
   'List transactions for a specific category',
   {
@@ -418,7 +427,7 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'list_transactions_by_payee',
   'List transactions for a specific payee',
   {
@@ -434,14 +443,14 @@ server.tool(
   }
 );
 
-server.tool(
+tool(
   'list_payees',
   'List all payees in a budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => jsonResponse(await client.getPayees(budgetId))
 );
 
-server.tool(
+tool(
   'update_payee',
   'Rename a payee',
   {
@@ -453,7 +462,7 @@ server.tool(
     jsonResponse(await client.updatePayee(payeeId, { payee: { name } }, budgetId))
 );
 
-server.tool(
+tool(
   'list_payee_locations',
   'List locations for a specific payee',
   {
@@ -464,14 +473,14 @@ server.tool(
     jsonResponse(await client.getPayeeLocationsByPayee(payeeId, budgetId))
 );
 
-server.tool(
+tool(
   'list_budget_months',
   'List all budget months',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getBudgetMonths(budgetId))
 );
 
-server.tool(
+tool(
   'get_budget_month',
   'Get budget details for a specific month',
   {
@@ -481,14 +490,14 @@ server.tool(
   async ({ month, budgetId }) => currencyResponse(await client.getBudgetMonth(month, budgetId))
 );
 
-server.tool(
+tool(
   'list_scheduled_transactions',
   'List all scheduled transactions in a budget',
   { budgetId: z.string().optional().describe('Budget ID (uses default if not specified)') },
   async ({ budgetId }) => currencyResponse(await client.getScheduledTransactions(budgetId))
 );
 
-server.tool(
+tool(
   'get_scheduled_transaction',
   'Get a single scheduled transaction',
   {
@@ -499,7 +508,7 @@ server.tool(
     currencyResponse(await client.getScheduledTransaction(scheduledTransactionId, budgetId))
 );
 
-server.tool(
+tool(
   'delete_scheduled_transaction',
   'Delete a scheduled transaction',
   {
@@ -510,34 +519,34 @@ server.tool(
     currencyResponse(await client.deleteScheduledTransaction(scheduledTransactionId, budgetId))
 );
 
-server.tool(
+tool(
   'raw_api_call',
   'Make a direct YNAB API call',
   {
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).describe('HTTP method'),
-    path: z.string().describe('API path (e.g., /budgets/{budget_id}/accounts). {budget_id} is replaced with the default budget.'),
-    data: z.record(z.unknown()).optional().describe('Request body for POST/PUT/PATCH'),
-    budgetId: z.string().optional().describe('Budget ID for {budget_id} replacement (uses default if not specified)'),
+    path: z.string().describe('API path (e.g., /plans/{plan_id}/accounts). {plan_id} or {budget_id} is replaced with the default budget.'),
+    data: z.record(z.string(), z.unknown()).optional().describe('Request body for POST/PUT/PATCH'),
+    budgetId: z.string().optional().describe('Budget ID for {plan_id} or {budget_id} replacement (uses default if not specified)'),
   },
   async ({ method, path, data, budgetId }) =>
     jsonResponse(await client.rawApiCall(method, path, data, budgetId))
 );
 
-server.tool(
+tool(
   'get_user',
   'Get information about the authenticated user',
   {},
   async () => jsonResponse(await client.getUser())
 );
 
-server.tool(
+tool(
   'check_auth',
   'Check if YNAB authentication is configured',
   {},
   async () => jsonResponse({ authenticated: await auth.isAuthenticated() })
 );
 
-server.tool(
+tool(
   'search_tools',
   'Search for available tools by name or description using regex. Returns matching tool names.',
   {

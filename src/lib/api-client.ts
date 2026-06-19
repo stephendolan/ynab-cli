@@ -63,9 +63,9 @@ export class YnabClient {
 
   async getBudgets(includeAccounts = false) {
     const api = await this.getApi();
-    const response = await api.budgets.getBudgets(includeAccounts);
+    const response = await api.plans.getPlans(includeAccounts);
     return {
-      budgets: response.data.budgets,
+      budgets: response.data.plans,
       server_knowledge: 0,
     };
   }
@@ -73,9 +73,9 @@ export class YnabClient {
   async getBudget(budgetId?: string, lastKnowledgeOfServer?: number) {
     const api = await this.getApi();
     const id = await this.getBudgetId(budgetId);
-    const response = await api.budgets.getBudgetById(id, lastKnowledgeOfServer);
+    const response = await api.plans.getPlanById(id, lastKnowledgeOfServer);
     return {
-      budget: response.data.budget,
+      budget: response.data.plan,
       server_knowledge: response.data.server_knowledge,
     };
   }
@@ -83,7 +83,7 @@ export class YnabClient {
   async getBudgetSettings(budgetId?: string) {
     const api = await this.getApi();
     const id = await this.getBudgetId(budgetId);
-    const response = await api.budgets.getBudgetSettingsById(id);
+    const response = await api.plans.getPlanSettingsById(id);
     return response.data.settings;
   }
 
@@ -174,7 +174,7 @@ export class YnabClient {
   async getBudgetMonths(budgetId?: string, lastKnowledgeOfServer?: number) {
     const api = await this.getApi();
     const id = await this.getBudgetId(budgetId);
-    const response = await api.months.getBudgetMonths(id, lastKnowledgeOfServer);
+    const response = await api.months.getPlanMonths(id, lastKnowledgeOfServer);
     return {
       months: response.data.months,
       server_knowledge: response.data.server_knowledge,
@@ -184,7 +184,7 @@ export class YnabClient {
   async getBudgetMonth(month: string, budgetId?: string) {
     const api = await this.getApi();
     const id = await this.getBudgetId(budgetId);
-    const response = await api.months.getBudgetMonth(id, month);
+    const response = await api.months.getPlanMonth(id, month);
     return response.data.month;
   }
 
@@ -369,9 +369,11 @@ export class YnabClient {
   async rawApiCall(method: string, path: string, data?: unknown, budgetId?: string) {
     await this.getApi();
 
-    const fullPath = path.includes('{budget_id}')
-      ? path.replace('{budget_id}', await this.getBudgetId(budgetId))
-      : path;
+    let fullPath = path;
+    if (path.includes('{budget_id}') || path.includes('{plan_id}')) {
+      const id = await this.getBudgetId(budgetId);
+      fullPath = path.replaceAll('{budget_id}', id).replaceAll('{plan_id}', id);
+    }
 
     const url = `https://api.ynab.com/v1${fullPath}`;
     const accessToken = (await auth.getAccessToken()) || process.env.YNAB_API_KEY;

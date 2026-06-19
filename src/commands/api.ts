@@ -13,8 +13,8 @@ export function createApiCommand(): Command {
 
   cmd
     .argument('<method>', 'HTTP method (GET, POST, PUT, PATCH, DELETE)')
-    .argument('<path>', 'API path (e.g., /budgets or /budgets/{budget_id}/transactions)')
-    .option('-b, --budget <id>', 'Budget ID (used to replace {budget_id} in path)')
+    .argument('<path>', 'API path (e.g., /plans or /plans/{plan_id}/transactions)')
+    .option('-b, --budget <id>', 'Budget ID (used to replace {plan_id} or {budget_id} in path)')
     .option('--data <json>', 'JSON data for POST/PUT/PATCH requests')
     .description('Make raw API calls to YNAB')
     .action(
