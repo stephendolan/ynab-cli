@@ -1,35 +1,41 @@
 import * as ynab from 'ynab';
 import { config } from './config.js';
 import { YnabCliError, sanitizeApiError } from './errors.js';
-import { auth } from './auth.js';
+import { auth, type ResolvedCredential } from './auth.js';
 
 type TransactionTypeFilter = 'uncategorized' | 'unapproved' | undefined;
 
+function isUnauthorizedError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const apiError = (error as { error?: unknown }).error;
+  if (typeof apiError !== 'object' || apiError === null) {
+    return false;
+  }
+
+  const { id, name } = apiError as { id?: unknown; name?: unknown };
+  return id === '401' && name === 'unauthorized';
+}
+
 export class YnabClient {
   private api: ynab.API | null = null;
+  private apiToken: string | null = null;
   private envVarWarningShown = false;
 
   clearApi(): void {
     this.api = null;
+    this.apiToken = null;
     this.envVarWarningShown = false;
   }
 
-  async getApi(): Promise<ynab.API> {
-    if (this.api) {
+  private getApiForCredential(credential: ResolvedCredential): ynab.API {
+    if (this.api && this.apiToken === credential.token) {
       return this.api;
     }
 
-    const keychainToken = await auth.getAccessToken();
-    const accessToken = keychainToken || process.env.YNAB_API_KEY || null;
-
-    if (!accessToken) {
-      throw new YnabCliError(
-        'Not authenticated. Please run: ynab auth login or set YNAB_API_KEY environment variable',
-        401
-      );
-    }
-
-    if (!keychainToken && process.env.YNAB_API_KEY && !this.envVarWarningShown) {
+    if (credential.source === 'environment' && !this.envVarWarningShown) {
       console.warn(
         '\x1b[33m⚠️  WARNING: Using YNAB_API_KEY environment variable.\n' +
           'Environment variables may be visible to other processes.\n' +
@@ -38,8 +44,26 @@ export class YnabClient {
       this.envVarWarningShown = true;
     }
 
-    this.api = new ynab.API(accessToken);
+    this.api = new ynab.API(credential.token);
+    this.apiToken = credential.token;
     return this.api;
+  }
+
+  private async resolveApi(): Promise<{ api: ynab.API; credential: ResolvedCredential }> {
+    const credential = await auth.resolveCredential();
+    if (!credential) {
+      this.clearApi();
+      throw new YnabCliError(
+        'Not authenticated. Please run: ynab auth login or set YNAB_API_KEY environment variable',
+        401
+      );
+    }
+
+    return { api: this.getApiForCredential(credential), credential };
+  }
+
+  async getApi(): Promise<ynab.API> {
+    return (await this.resolveApi()).api;
   }
 
   async getBudgetId(budgetIdOrDefault?: string): Promise<string> {
@@ -59,6 +83,29 @@ export class YnabClient {
     const api = await this.getApi();
     const response = await api.user.getUser();
     return response.data.user;
+  }
+
+  async checkAuthentication() {
+    const credential = await auth.resolveCredential();
+    if (!credential) {
+      this.clearApi();
+      return { authenticated: false, credentialPresent: false } as const;
+    }
+
+    try {
+      const api = this.getApiForCredential(credential);
+      const response = await api.user.getUser();
+      return {
+        authenticated: true,
+        credentialPresent: true,
+        user: response.data.user,
+      } as const;
+    } catch (error) {
+      if (isUnauthorizedError(error)) {
+        return { authenticated: false, credentialPresent: true } as const;
+      }
+      throw error;
+    }
   }
 
   async getBudgets(includeAccounts = false) {
@@ -367,7 +414,7 @@ export class YnabClient {
   }
 
   async rawApiCall(method: string, path: string, data?: unknown, budgetId?: string) {
-    await this.getApi();
+    const { credential } = await this.resolveApi();
 
     let fullPath = path;
     if (path.includes('{budget_id}') || path.includes('{plan_id}')) {
@@ -376,9 +423,8 @@ export class YnabClient {
     }
 
     const url = `https://api.ynab.com/v1${fullPath}`;
-    const accessToken = (await auth.getAccessToken()) || process.env.YNAB_API_KEY;
     const headers = {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${credential.token}`,
       'Content-Type': 'application/json',
     };
 

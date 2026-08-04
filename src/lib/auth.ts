@@ -12,6 +12,11 @@ const KEYRING_UNAVAILABLE_ERROR =
 
 let keyring: Entry | null | undefined = undefined;
 
+export interface ResolvedCredential {
+  token: string;
+  source: 'keychain' | 'environment';
+}
+
 function getKeyring(): Entry | null {
   if (keyring !== undefined) {
     return keyring;
@@ -41,6 +46,20 @@ export class AuthManager {
     return null;
   }
 
+  async resolveCredential(): Promise<ResolvedCredential | null> {
+    const keychainToken = await this.getAccessToken();
+    if (keychainToken) {
+      return { token: keychainToken, source: 'keychain' };
+    }
+
+    const environmentToken = process.env.YNAB_API_KEY;
+    if (environmentToken) {
+      return { token: environmentToken, source: 'environment' };
+    }
+
+    return null;
+  }
+
   async setAccessToken(token: string): Promise<void> {
     const entry = getKeyring();
     if (!entry) {
@@ -64,10 +83,6 @@ export class AuthManager {
       return entry.deletePassword();
     }
     return false;
-  }
-
-  async isAuthenticated(): Promise<boolean> {
-    return (await this.getAccessToken()) !== null;
   }
 
   async logout(): Promise<void> {

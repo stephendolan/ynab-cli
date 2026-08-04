@@ -74,19 +74,17 @@ export function createAuthCommand(): Command {
     .description('Check authentication status')
     .action(
       withErrorHandling(async () => {
-        const isAuthenticated = await auth.isAuthenticated();
+        const status = await client.checkAuthentication();
 
-        if (!isAuthenticated) {
-          outputJson({ authenticated: false, message: 'Not authenticated' });
+        if (!status.authenticated) {
+          outputJson({
+            authenticated: false,
+            message: status.credentialPresent ? 'Token exists but is invalid' : 'Not authenticated',
+          });
           return;
         }
 
-        try {
-          const user = await client.getUser();
-          outputJson({ authenticated: true, user: { id: user?.id } });
-        } catch {
-          outputJson({ authenticated: false, message: 'Token exists but is invalid' });
-        }
+        outputJson({ authenticated: true, user: { id: status.user?.id } });
       })
     );
 
