@@ -2,7 +2,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod/v3';
 import { client } from '../lib/api-client.js';
-import { auth } from '../lib/auth.js';
 import { YnabCliError, sanitizeApiError, sanitizeErrorMessage } from '../lib/errors.js';
 import { amountToMilliunits, applyFieldSelection, applyTransactionFilters, convertMilliunitsToAmounts, summarizeTransactions, findTransferCandidates, type SummaryTransaction, type TransactionLike } from '../lib/utils.js';
 
@@ -38,7 +37,7 @@ const toolRegistry = [
   { name: 'delete_scheduled_transaction', description: 'Delete a scheduled transaction' },
   { name: 'raw_api_call', description: 'Make a direct YNAB API call' },
   { name: 'get_user', description: 'Get information about the authenticated user' },
-  { name: 'check_auth', description: 'Check if YNAB authentication is configured' },
+  { name: 'check_auth', description: 'Check if YNAB authentication is configured and valid' },
 ];
 
 const server = new McpServer({
@@ -98,6 +97,11 @@ function jsonResponse(data: unknown) {
 
 function currencyResponse(data: unknown) {
   return jsonResponse(convertMilliunitsToAmounts(data));
+}
+
+export async function checkAuth() {
+  const status = await client.checkAuthentication();
+  return jsonResponse({ authenticated: status.authenticated });
 }
 
 tool(
@@ -541,9 +545,9 @@ tool(
 
 tool(
   'check_auth',
-  'Check if YNAB authentication is configured',
+  'Check if YNAB authentication is configured and valid',
   {},
-  async () => jsonResponse({ authenticated: await auth.isAuthenticated() })
+  checkAuth
 );
 
 tool(
