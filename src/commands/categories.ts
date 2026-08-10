@@ -103,6 +103,56 @@ export function createCategoriesCommand(): Command {
     );
 
   cmd
+    .command('create')
+    .description('Create a new category')
+    .requiredOption('--name <name>', 'Category name')
+    .requiredOption('--category-group-id <id>', 'Category group ID')
+    .option('--note <note>', 'Category note')
+    .option('--goal-target <amount>', 'Goal target amount in dollars', parseFloat)
+    .option('-b, --budget <id>', 'Budget ID')
+    .action(
+      withErrorHandling(
+        async (
+          options: {
+            name: string;
+            categoryGroupId: string;
+            note?: string;
+            goalTarget?: number;
+            budget?: string;
+          } & CommandOptions
+        ) => {
+          if (!options.name?.trim()) {
+            throw new YnabCliError('Name cannot be empty', 400);
+          }
+
+          const categoryData: {
+            name: string;
+            category_group_id: string;
+            note?: string;
+            goal_target?: number;
+          } = {
+            name: options.name.trim(),
+            category_group_id: options.categoryGroupId,
+          };
+
+          if (options.note !== undefined) {
+            categoryData.note = options.note.trim();
+          }
+
+          if (options.goalTarget !== undefined) {
+            categoryData.goal_target = amountToMilliunits(options.goalTarget);
+          }
+
+          const category = await client.createCategory(
+            { category: categoryData },
+            options.budget
+          );
+          outputJson(category);
+        }
+      )
+    );
+
+  cmd
     .command('budget')
     .description('Set category budgeted amount for a month (overrides existing amount)')
     .argument('<id>', 'Category ID')

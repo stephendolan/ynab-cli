@@ -114,3 +114,66 @@ describe('YnabClient authentication status', () => {
     expect(mockApiConstructor).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('YnabClient payee methods', () => {
+  const validToken = 'valid-test-token';
+  const budgetId = 'test-budget-id';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCredential.mockResolvedValue({ token: validToken, source: 'keychain' });
+  });
+
+  it('creates a payee and returns the created payee', async () => {
+    const mockCreatePayee = vi.fn();
+    mockApiConstructor.mockImplementation(function () {
+      return { payees: { createPayee: mockCreatePayee } };
+    });
+
+    mockCreatePayee.mockResolvedValue({
+      data: {
+        payee: { id: 'new-payee-id', name: 'Test Payee' },
+      },
+    });
+
+    const client = new YnabClient();
+    const result = await client.createPayee({ payee: { name: 'Test Payee' } }, budgetId);
+
+    expect(mockCreatePayee).toHaveBeenCalledWith(budgetId, { payee: { name: 'Test Payee' } });
+    expect(result).toEqual({ id: 'new-payee-id', name: 'Test Payee' });
+  });
+});
+
+describe('YnabClient category methods', () => {
+  const validToken = 'valid-test-token';
+  const budgetId = 'test-budget-id';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveCredential.mockResolvedValue({ token: validToken, source: 'keychain' });
+  });
+
+  it('creates a category and returns the created category', async () => {
+    const mockCreateCategory = vi.fn();
+    mockApiConstructor.mockImplementation(function () {
+      return { categories: { createCategory: mockCreateCategory } };
+    });
+
+    mockCreateCategory.mockResolvedValue({
+      data: {
+        category: { id: 'new-category-id', name: 'Test Category' },
+      },
+    });
+
+    const client = new YnabClient();
+    const result = await client.createCategory(
+      { category: { name: 'Test Category', category_group_id: 'group-id' } },
+      budgetId
+    );
+
+    expect(mockCreateCategory).toHaveBeenCalledWith(budgetId, {
+      category: { name: 'Test Category', category_group_id: 'group-id' },
+    });
+    expect(result).toEqual({ id: 'new-category-id', name: 'Test Category' });
+  });
+});

@@ -187,6 +187,13 @@ export class YnabClient {
     return response.data.category;
   }
 
+  async createCategory(data: ynab.PostCategoryWrapper, budgetId?: string) {
+    const api = await this.getApi();
+    const id = await this.getBudgetId(budgetId);
+    const response = await api.categories.createCategory(id, data);
+    return response.data.category;
+  }
+
   async getPayees(budgetId?: string, lastKnowledgeOfServer?: number) {
     const api = await this.getApi();
     const id = await this.getBudgetId(budgetId);
@@ -208,6 +215,13 @@ export class YnabClient {
     const api = await this.getApi();
     const id = await this.getBudgetId(budgetId);
     const response = await api.payees.updatePayee(id, payeeId, data);
+    return response.data.payee;
+  }
+
+  async createPayee(data: ynab.PostPayeeWrapper, budgetId?: string) {
+    const api = await this.getApi();
+    const id = await this.getBudgetId(budgetId);
+    const response = await api.payees.createPayee(id, data);
     return response.data.payee;
   }
 

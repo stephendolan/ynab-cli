@@ -44,7 +44,6 @@ The CLI follows a command-based architecture built on Commander.js:
   - **utils.ts**: Currency conversion, date formatting, filtering, field selection
   - **errors.ts**: Centralized error handling for YNAB API errors
   - **command-utils.ts**: Shared command helpers
-  - **prompts.ts**: Interactive prompts using inquirer
 - **src/types/**: TypeScript type definitions
 
 ### Authentication Flow
@@ -90,7 +89,7 @@ All API calls go through `YnabClient.withErrorHandling()` which catches errors a
 2. Export a `create*Command()` function that returns a Commander Command
 3. Register in src/cli.ts
 4. Use `client` from src/lib/api-client.ts for API calls
-5. Use `outputJson()` or `outputSuccess()` for JSON output
+5. Use `outputJson()` for JSON output
 6. Handle milliunits conversion:
    - Input: Use `amountToMilliunits()` for user-provided amounts
    - Output: Automatic via `outputJson()` - don't manually convert
@@ -98,9 +97,8 @@ All API calls go through `YnabClient.withErrorHandling()` which catches errors a
 ## API Limitations
 
 YNAB API does not support:
-- Creating categories or category groups
-- Creating payees
-- Creating or updating accounts (beyond initial creation)
+- Creating category groups
+- Updating accounts
 
 These operations must be done through YNAB's web/mobile apps.
 
