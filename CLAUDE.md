@@ -97,7 +97,6 @@ All API calls go through `YnabClient.withErrorHandling()` which catches errors a
 ## API Limitations
 
 YNAB API does not support:
-- Creating category groups
 - Updating accounts
 
 These operations must be done through YNAB's web/mobile apps.

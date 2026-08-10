@@ -153,6 +153,27 @@ export function createCategoriesCommand(): Command {
     );
 
   cmd
+    .command('create-group')
+    .description('Create a new category group')
+    .requiredOption('--name <name>', 'Category group name (max 50 characters)')
+    .option('-b, --budget <id>', 'Budget ID')
+    .action(
+      withErrorHandling(
+        async (options: { name: string; budget?: string } & CommandOptions) => {
+          if (!options.name?.trim()) {
+            throw new YnabCliError('Name cannot be empty', 400);
+          }
+
+          const categoryGroup = await client.createCategoryGroup(
+            { category_group: { name: options.name.trim() } },
+            options.budget
+          );
+          outputJson(categoryGroup);
+        }
+      )
+    );
+
+  cmd
     .command('budget')
     .description('Set category budgeted amount for a month (overrides existing amount)')
     .argument('<id>', 'Category ID')

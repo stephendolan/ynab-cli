@@ -63,6 +63,7 @@ ynab accounts transactions <id>
 ynab categories list
 ynab categories view <id>
 ynab categories create --name <name> --category-group-id <id> [--note <note>] [--goal-target <amount>]
+ynab categories create-group --name <name>
 ynab categories update <id> [--name <name>] [--note <note>] [--category-group-id <id>] [--goal-target <amount>]
 ynab categories budget <id> --month <YYYY-MM> --amount <amount>
 ynab categories transactions <id>
@@ -137,7 +138,7 @@ All commands return JSON. Use `--compact` for minified output.
 
 ## API Limitations
 
-The YNAB API does not support creating category groups or updating accounts. Use the web or mobile app for these operations.
+The YNAB API does not support updating accounts. Use the web or mobile app for this operation.
 
 Rate limit: 200 requests/hour per token. If exceeded, wait 5-10 minutes.
 

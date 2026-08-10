@@ -176,4 +176,28 @@ describe('YnabClient category methods', () => {
     });
     expect(result).toEqual({ id: 'new-category-id', name: 'Test Category' });
   });
+
+  it('creates a category group and returns the created category group', async () => {
+    const mockCreateCategoryGroup = vi.fn();
+    mockApiConstructor.mockImplementation(function () {
+      return { categories: { createCategoryGroup: mockCreateCategoryGroup } };
+    });
+
+    mockCreateCategoryGroup.mockResolvedValue({
+      data: {
+        category_group: { id: 'new-group-id', name: 'Test Group' },
+      },
+    });
+
+    const client = new YnabClient();
+    const result = await client.createCategoryGroup(
+      { category_group: { name: 'Test Group' } },
+      budgetId
+    );
+
+    expect(mockCreateCategoryGroup).toHaveBeenCalledWith(budgetId, {
+      category_group: { name: 'Test Group' },
+    });
+    expect(result).toEqual({ id: 'new-group-id', name: 'Test Group' });
+  });
 });
