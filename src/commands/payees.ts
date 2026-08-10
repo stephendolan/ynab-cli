@@ -60,6 +60,27 @@ export function createPayeesCommand(): Command {
     );
 
   cmd
+    .command('create')
+    .description('Create a new payee')
+    .requiredOption('--name <name>', 'Payee name')
+    .option('-b, --budget <id>', 'Budget ID')
+    .action(
+      withErrorHandling(
+        async (options: { name: string; budget?: string } & CommandOptions) => {
+          if (!options.name?.trim()) {
+            throw new YnabCliError('Name cannot be empty', 400);
+          }
+
+          const payee = await client.createPayee(
+            { payee: { name: options.name } },
+            options.budget
+          );
+          outputJson(payee);
+        }
+      )
+    );
+
+  cmd
     .command('locations')
     .description('List locations for payee')
     .argument('<id>', 'Payee ID')
