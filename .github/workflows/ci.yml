@@ -19,5 +19,5 @@ jobs:
       - run: bun install
       - run: bun run typecheck
       - run: bun run lint
-      - run: bun test
+      - run: bun run test --run
       - run: bun run build

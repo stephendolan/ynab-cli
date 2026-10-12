@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { YnabCliError, sanitizeApiError } from './errors.js';
 import { auth, type ResolvedCredential } from './auth.js';
 
-type TransactionTypeFilter = 'uncategorized' | 'unapproved' | undefined;
+type TransactionTypeFilter = ynab.GetTransactionsRequest['type'];
 
 function isUnauthorizedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) {
@@ -243,12 +243,13 @@ export class YnabClient {
   }) {
     const api = await this.getApi();
     const id = await this.getBudgetId(params.budgetId);
-    const response = await api.transactions.getTransactions(
-      id,
-      params.sinceDate,
-      params.type as TransactionTypeFilter,
-      params.lastKnowledgeOfServer
-    );
+    const request = await api.transactions.getTransactionsRaw({
+      planId: id,
+      sinceDate: params.sinceDate,
+      type: params.type as TransactionTypeFilter,
+      lastKnowledgeOfServer: params.lastKnowledgeOfServer,
+    });
+    const response = await request.value();
     return {
       transactions: response.data.transactions,
       server_knowledge: response.data.server_knowledge,
@@ -266,13 +267,14 @@ export class YnabClient {
   ) {
     const api = await this.getApi();
     const id = await this.getBudgetId(params.budgetId);
-    const response = await api.transactions.getTransactionsByAccount(
-      id,
+    const request = await api.transactions.getTransactionsByAccountRaw({
+      planId: id,
       accountId,
-      params.sinceDate,
-      params.type as TransactionTypeFilter,
-      params.lastKnowledgeOfServer
-    );
+      sinceDate: params.sinceDate,
+      type: params.type as TransactionTypeFilter,
+      lastKnowledgeOfServer: params.lastKnowledgeOfServer,
+    });
+    const response = await request.value();
     return {
       transactions: response.data.transactions,
       server_knowledge: response.data.server_knowledge,
@@ -290,13 +292,14 @@ export class YnabClient {
   ) {
     const api = await this.getApi();
     const id = await this.getBudgetId(params.budgetId);
-    const response = await api.transactions.getTransactionsByCategory(
-      id,
+    const request = await api.transactions.getTransactionsByCategoryRaw({
+      planId: id,
       categoryId,
-      params.sinceDate,
-      params.type as TransactionTypeFilter,
-      params.lastKnowledgeOfServer
-    );
+      sinceDate: params.sinceDate,
+      type: params.type as TransactionTypeFilter,
+      lastKnowledgeOfServer: params.lastKnowledgeOfServer,
+    });
+    const response = await request.value();
     return {
       transactions: response.data.transactions,
       server_knowledge: response.data.server_knowledge,
@@ -314,13 +317,14 @@ export class YnabClient {
   ) {
     const api = await this.getApi();
     const id = await this.getBudgetId(params.budgetId);
-    const response = await api.transactions.getTransactionsByPayee(
-      id,
+    const request = await api.transactions.getTransactionsByPayeeRaw({
+      planId: id,
       payeeId,
-      params.sinceDate,
-      params.type as TransactionTypeFilter,
-      params.lastKnowledgeOfServer
-    );
+      sinceDate: params.sinceDate,
+      type: params.type as TransactionTypeFilter,
+      lastKnowledgeOfServer: params.lastKnowledgeOfServer,
+    });
+    const response = await request.value();
     return {
       transactions: response.data.transactions,
       server_knowledge: response.data.server_knowledge,

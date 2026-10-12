@@ -1,4 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
+import { rmSync } from 'node:fs';
+
+const configDirectory = await vi.hoisted(async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  return mkdtempSync(join(tmpdir(), 'ynab-cli-auth-test-'));
+});
+
+vi.mock('conf', async (importOriginal) => {
+  const { default: Conf } = await importOriginal<typeof import('conf')>();
+  return {
+    default: class extends Conf {
+      constructor(options: ConstructorParameters<typeof Conf>[0]) {
+        super({ ...options, cwd: configDirectory });
+      }
+    },
+  };
+});
+
+afterAll(() => rmSync(configDirectory, { recursive: true, force: true }));
 
 const mockEntry = {
   getPassword: vi.fn(),
