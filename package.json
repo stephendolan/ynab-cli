@@ -50,7 +50,7 @@
     "commander": "^15.0.0",
     "conf": "^15.0.2",
     "dayjs": "^1.11.19",
-    "ynab": "^4.0.0",
+    "ynab": "^4.5.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
