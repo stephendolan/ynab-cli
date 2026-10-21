@@ -22,8 +22,7 @@ function promptForToken(): Promise<string> {
       input: process.stdin,
       output: process.stderr,
     });
-    process.stderr.write('Enter YNAB Personal Access Token: ');
-    rl.question('', (answer) => {
+    rl.question('Enter YNAB Personal Access Token: ', (answer) => {
       rl.close();
       resolve(answer.trim());
     });
